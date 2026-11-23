@@ -1,0 +1,219 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+
+type Submission = {
+  id: number;
+  studentName: string;
+  studentEmail: string;
+  quiz: unknown;
+  quizAnswers: unknown;
+  reportCard: unknown;
+  studentResponse: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ClassInfo = { id: number; name: string; joinCode: string | null };
+
+const colors = {
+  bg: "#F7F5F0",
+  ink: "#1E2230",
+  muted: "#6B7080",
+  accent: "#8A5A3B",
+  border: "#E7E2D8",
+  cardBorder: "#D8D3C6",
+  green: "#3F7A5E",
+  amber: "#B8822F",
+  amberBg: "#FBF0DA",
+};
+
+function statusBadge(status: string) {
+  if (status === "flagged") {
+    return { label: "Needs review", bg: colors.amberBg, fg: colors.amber };
+  }
+  if (status === "cleared") {
+    return { label: "Cleared", bg: "#E7F1EB", fg: colors.green };
+  }
+  return { label: "Submitted", bg: "#EFEDE6", fg: colors.muted };
+}
+
+export default function SubmissionsClient() {
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const [cls, setCls] = useState<ClassInfo | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
+
+  async function load() {
+    const res = await fetch(`/api/classes/${params.id}/submissions`);
+    if (res.status === 401) {
+      router.push("/login");
+      return;
+    }
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "Failed to load submissions.");
+      return;
+    }
+    setCls(data.class);
+    setSubmissions(data.submissions);
+  }
+
+  const flagged = submissions?.filter((s) => s.status === "flagged") ?? [];
+  const rest = submissions?.filter((s) => s.status !== "flagged") ?? [];
+
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        background: colors.bg,
+        fontFamily: "Inter, system-ui, sans-serif",
+        color: colors.ink,
+        padding: "48px 32px 80px",
+      }}
+    >
+      <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div>
+          <Link href="/classes" style={{ fontSize: 13, color: colors.muted, textDecoration: "none" }}>
+            ← Back to classes
+          </Link>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: colors.accent,
+              marginTop: 10,
+            }}
+          >
+            Luminatra
+          </div>
+          <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>
+            {cls ? `${cls.name} — submissions` : "Submissions"}
+          </h1>
+        </div>
+
+        {error && <div style={{ color: colors.amber, fontSize: 14 }}>{error}</div>}
+
+        {submissions === null && !error && (
+          <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>
+        )}
+
+        {submissions?.length === 0 && (
+          <div
+            style={{
+              background: "#fff",
+              border: `1px solid ${colors.border}`,
+              borderRadius: 10,
+              padding: 32,
+              textAlign: "center",
+              color: colors.muted,
+              fontSize: 14,
+            }}
+          >
+            No submissions yet. Once students submit their work and transcript, flagged ones will show up here
+            first.
+          </div>
+        )}
+
+        {submissions && submissions.length > 0 && (
+          <>
+            <div>
+              <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 10px" }}>
+                Needs review {flagged.length > 0 ? `(${flagged.length})` : ""}
+              </h2>
+              {flagged.length === 0 ? (
+                <div style={{ color: colors.muted, fontSize: 13 }}>
+                  Nothing flagged right now — every submission checked out clean.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {flagged.map((s) => (
+                    <SubmissionRow key={s.id} s={s} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {rest.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowAll((v) => !v)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: colors.muted,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    marginBottom: showAll ? 10 : 0,
+                  }}
+                >
+                  {showAll ? "Hide" : "Show"} {rest.length} other submission{rest.length === 1 ? "" : "s"} ▾
+                </button>
+                {showAll && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {rest.map((s) => (
+                      <SubmissionRow key={s.id} s={s} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function SubmissionRow({ s }: { s: Submission }) {
+  const badge = statusBadge(s.status);
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: `1px solid ${colors.border}`,
+        borderRadius: 10,
+        padding: "14px 18px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>{s.studentName}</div>
+        <div style={{ fontSize: 12, color: colors.muted }}>{s.studentEmail}</div>
+        <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+          {new Date(s.createdAt).toLocaleString()}
+        </div>
+      </div>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: 999,
+          background: badge.bg,
+          color: badge.fg,
+        }}
+      >
+        {badge.label}
+      </span>
+    </div>
+  );
+}

@@ -21,9 +21,28 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/classes/[i
     return NextResponse.json({ error: "Expected JSON body." }, { status: 400 });
   }
 
-  const quizOpen = (body as { quizOpen?: unknown })?.quizOpen;
-  if (typeof quizOpen !== "boolean") {
+  const quizOpenRaw = (body as { quizOpen?: unknown })?.quizOpen;
+  const joinCodeRaw = (body as { joinCode?: unknown })?.joinCode;
+
+  if (quizOpenRaw === undefined && joinCodeRaw === undefined) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+  }
+  if (quizOpenRaw !== undefined && typeof quizOpenRaw !== "boolean") {
     return NextResponse.json({ error: "quizOpen must be a boolean." }, { status: 400 });
+  }
+
+  let joinCode: string | undefined;
+  if (joinCodeRaw !== undefined) {
+    if (typeof joinCodeRaw !== "string") {
+      return NextResponse.json({ error: "joinCode must be a string." }, { status: 400 });
+    }
+    joinCode = joinCodeRaw.trim().toUpperCase();
+    if (!/^[A-Z0-9]{3,12}$/.test(joinCode)) {
+      return NextResponse.json(
+        { error: "Class code must be 3-12 letters/numbers." },
+        { status: 400 }
+      );
+    }
   }
 
   // Only update a class that actually belongs to this teacher — otherwise
@@ -33,10 +52,21 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/classes/[i
     return NextResponse.json({ error: "Class not found." }, { status: 404 });
   }
 
+  if (joinCode) {
+    const codeTaken = await db.orm.public.Class.where({ joinCode }).first();
+    if (codeTaken && codeTaken.id !== id) {
+      return NextResponse.json({ error: "That code is already in use by another class." }, { status: 409 });
+    }
+  }
+
+  const patch: { quizOpen?: boolean; joinCode?: string } = {};
+  if (typeof quizOpenRaw === "boolean") patch.quizOpen = quizOpenRaw;
+  if (joinCode) patch.joinCode = joinCode;
+
   const updated = await db.orm.public.Class
     .where({ id })
-    .select("id", "name", "syllabusText", "quizOpen", "createdAt")
-    .update({ quizOpen });
+    .select("id", "name", "syllabusText", "quizOpen", "joinCode", "createdAt")
+    .update(patch);
 
   return NextResponse.json({ class: updated });
 }

@@ -28,6 +28,10 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState<ClassRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [editingCodeId, setEditingCodeId] = useState<number | null>(null);
+  const [codeDraft, setCodeDraft] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [savingCode, setSavingCode] = useState(false);
 
   useEffect(() => {
     void load();
@@ -63,6 +67,40 @@ export default function ClassesPage() {
       }
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  function startEditCode(cls: ClassRow) {
+    setEditingCodeId(cls.id);
+    setCodeDraft(cls.joinCode ?? "");
+    setCodeError(null);
+  }
+
+  async function saveCode(cls: ClassRow) {
+    const next = codeDraft.trim().toUpperCase();
+    if (!/^[A-Z0-9]{3,12}$/.test(next)) {
+      setCodeError("3-12 letters/numbers.");
+      return;
+    }
+    setSavingCode(true);
+    setCodeError(null);
+    try {
+      const res = await fetch(`/api/classes/${cls.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ joinCode: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCodeError(data.error ?? "Could not save code.");
+        return;
+      }
+      setClasses((prev) =>
+        prev ? prev.map((c) => (c.id === cls.id ? { ...c, joinCode: data.class.joinCode } : c)) : prev
+      );
+      setEditingCodeId(null);
+    } finally {
+      setSavingCode(false);
     }
   }
 
@@ -176,26 +214,107 @@ export default function ClassesPage() {
                   {cls.syllabusText.length > 90 ? "..." : ""}
                 </div>
                 <div style={{ fontSize: 12, marginTop: 6 }}>
-                  {cls.joinCode ? (
-                    <span>
-                      Class code:{" "}
-                      <span
+                  {editingCodeId === cls.id ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span>Class code:</span>
+                      <input
+                        value={codeDraft}
+                        onChange={(e) => setCodeDraft(e.target.value.toUpperCase())}
+                        maxLength={12}
                         style={{
                           fontFamily: "monospace",
                           fontWeight: 700,
                           letterSpacing: "0.08em",
-                          color: colors.ink,
+                          border: `1px solid ${colors.cardBorder}`,
+                          borderRadius: 6,
+                          padding: "2px 6px",
+                          width: 100,
+                        }}
+                      />
+                      <button
+                        onClick={() => saveCode(cls)}
+                        disabled={savingCode}
+                        style={{
+                          border: "none",
+                          background: colors.ink,
+                          color: "#fff",
+                          borderRadius: 6,
+                          padding: "3px 8px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: savingCode ? "default" : "pointer",
                         }}
                       >
-                        {cls.joinCode}
-                      </span>
-                    </span>
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingCodeId(null)}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          color: colors.muted,
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      {codeError && <span style={{ color: colors.accent }}>{codeError}</span>}
+                    </div>
                   ) : (
-                    <span style={{ color: colors.muted }}>No code (created before this feature)</span>
+                    <span>
+                      {cls.joinCode ? (
+                        <>
+                          Class code:{" "}
+                          <span
+                            style={{
+                              fontFamily: "monospace",
+                              fontWeight: 700,
+                              letterSpacing: "0.08em",
+                              color: colors.ink,
+                            }}
+                          >
+                            {cls.joinCode}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ color: colors.muted }}>No code (created before this feature)</span>
+                      )}{" "}
+                      <button
+                        onClick={() => startEditCode(cls)}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          color: colors.accent,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          padding: 0,
+                          marginLeft: 4,
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </span>
                   )}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Link
+                  href={`/classes/${cls.id}/submissions`}
+                  style={{
+                    background: "#fff",
+                    color: colors.ink,
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: 8,
+                    padding: "7px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                  }}
+                >
+                  Review submissions
+                </Link>
                 <span
                   style={{
                     fontSize: 12,
