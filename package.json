@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma db update --yes && next build",
+    "build": "prisma db update --yes --delete public.Post --delete public.User && next build",
     "start": "next start",
     "lint": "eslint",
     "contract:emit": "prisma contract emit"
