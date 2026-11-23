@@ -1,0 +1,210 @@
+"use client";
+
+import { useState } from "react";
+
+// One compact review card, shared by the per-class submissions page and the
+// all-classes /review page so the teacher sees the same thing everywhere.
+
+export type ReviewQuiz = {
+  policy_summary: string;
+  policy_concern: string | null;
+  quiz: { question: string }[];
+};
+
+export type ReviewSubmission = {
+  id: number;
+  classId: number;
+  className?: string;
+  assignmentTitle: string;
+  studentName: string;
+  studentEmail: string;
+  quiz: ReviewQuiz | null;
+  quizAnswers: string[] | null;
+  studentResponse: string | null;
+  status: string;
+  createdAt: string;
+};
+
+export const colors = {
+  bg: "#F7F5F0",
+  ink: "#1E2230",
+  muted: "#6B7080",
+  accent: "#8A5A3B",
+  border: "#E7E2D8",
+  cardBorder: "#D8D3C6",
+  green: "#3F7A5E",
+  amber: "#B8822F",
+  amberBg: "#FBF0DA",
+};
+
+function badgeFor(status: string) {
+  if (status === "flagged") return { label: "Needs review", bg: colors.amberBg, fg: colors.amber };
+  if (status === "cleared") return { label: "Cleared", bg: "#E7F1EB", fg: colors.green };
+  return { label: "Clean", bg: "#EFEDE6", fg: colors.muted };
+}
+
+export async function clearSubmission(s: ReviewSubmission): Promise<string | null> {
+  const res = await fetch(`/api/classes/${s.classId}/submissions/${s.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: "cleared" }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.submission?.status ?? "cleared";
+}
+
+export function ReviewCard({
+  s,
+  onCleared,
+}: {
+  s: ReviewSubmission;
+  onCleared: (id: number, status: string) => void;
+}) {
+  const badge = badgeFor(s.status);
+  const [open, setOpen] = useState(false);
+  const [showRule, setShowRule] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const questions = s.quiz?.quiz ?? [];
+  const answered = questions.length > 0 && questions.every((_, i) => s.quizAnswers?.[i]);
+
+  async function handleClear() {
+    setBusy(true);
+    const status = await clearSubmission(s);
+    setBusy(false);
+    if (status) onCleared(s.id, status);
+  }
+
+  return (
+    <div style={{ background: "#fff", border: `1px solid ${colors.border}`, borderRadius: 10, padding: "12px 16px" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: "none",
+          border: "none",
+          padding: 0,
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          cursor: "pointer",
+          textAlign: "left",
+          color: colors.ink,
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{s.studentName}</div>
+          <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+            {s.className ? `${s.className} · ` : ""}
+            {s.assignmentTitle} · {new Date(s.createdAt).toLocaleDateString()}
+          </div>
+          {!open && s.status === "flagged" && s.quiz?.policy_concern && (
+            <div style={{ fontSize: 13, color: colors.amber, marginTop: 4 }}>{s.quiz.policy_concern}</div>
+          )}
+        </div>
+        <span
+          style={{
+            flexShrink: 0,
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "4px 10px",
+            borderRadius: 999,
+            background: badge.bg,
+            color: badge.fg,
+          }}
+        >
+          {badge.label}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: `1px solid ${colors.border}`,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            fontSize: 13,
+          }}
+        >
+          {s.quiz?.policy_concern && (
+            <div style={{ background: colors.amberBg, borderRadius: 8, padding: "8px 12px", color: colors.ink }}>
+              <strong style={{ color: colors.amber }}>Why flagged: </strong>
+              {s.quiz.policy_concern}
+            </div>
+          )}
+
+          {questions.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontWeight: 700 }}>
+                Comprehension check{" "}
+                <span style={{ fontWeight: 400, color: colors.muted }}>
+                  {answered ? "— answered" : "— not answered yet"}
+                </span>
+              </div>
+              {questions.map((q, i) => (
+                <div key={i}>
+                  <div style={{ color: colors.muted }}>Q: {q.question}</div>
+                  <div style={{ marginTop: 2 }}>
+                    A: {s.quizAnswers?.[i] ? s.quizAnswers[i] : <em style={{ color: colors.muted }}>—</em>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {s.studentResponse && (
+            <div>
+              <div style={{ fontWeight: 700 }}>Student&apos;s explanation</div>
+              <div style={{ marginTop: 2 }}>{s.studentResponse}</div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            {s.status === "flagged" && (
+              <button
+                onClick={handleClear}
+                disabled={busy}
+                style={{
+                  background: colors.ink,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "7px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: busy ? "default" : "pointer",
+                }}
+              >
+                {busy ? "Clearing..." : "Mark cleared"}
+              </button>
+            )}
+            {s.quiz?.policy_summary && (
+              <button
+                onClick={() => setShowRule((v) => !v)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  color: colors.accent,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {showRule ? "Hide" : "Show"} syllabus AI rule
+              </button>
+            )}
+          </div>
+          {showRule && s.quiz?.policy_summary && (
+            <div style={{ color: colors.muted, fontSize: 12 }}>{s.quiz.policy_summary}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

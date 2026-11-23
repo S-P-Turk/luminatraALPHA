@@ -31,6 +31,7 @@ export default function ClassesPage() {
   const [codeDraft, setCodeDraft] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [savingCode, setSavingCode] = useState(false);
+  const [needsReview, setNeedsReview] = useState<number | null>(null);
 
   useEffect(() => {
     void load();
@@ -48,6 +49,14 @@ export default function ClassesPage() {
       return;
     }
     setClasses(data.classes);
+
+    const reviewRes = await fetch("/api/review");
+    if (reviewRes.ok) {
+      const reviewData = await reviewRes.json();
+      setNeedsReview(
+        (reviewData.submissions as { status: string }[]).filter((s) => s.status === "flagged").length
+      );
+    }
   }
 
   function startEditCode(cls: ClassRow) {
@@ -116,6 +125,21 @@ export default function ClassesPage() {
             <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Your classes</h1>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
+            <Link
+              href="/review"
+              style={{
+                background: needsReview ? "#FBF0DA" : "#fff",
+                color: needsReview ? "#B8822F" : colors.ink,
+                border: `1px solid ${needsReview ? "#B8822F" : colors.cardBorder}`,
+                borderRadius: 8,
+                padding: "9px 16px",
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Review{needsReview ? ` (${needsReview})` : ""}
+            </Link>
             <Link
               href="/classes/new"
               style={{

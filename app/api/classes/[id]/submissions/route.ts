@@ -24,6 +24,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
     .where({ classId: id })
     .select(
       "id",
+      "classId",
       "assignmentId",
       "studentName",
       "studentEmail",

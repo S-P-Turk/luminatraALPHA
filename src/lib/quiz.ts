@@ -21,6 +21,8 @@ Your job, in order:
 
 4. Only report a policy_concern if the transcript affirmatively shows the AI being used in a way the syllabus doesn't allow — for example, the syllabus bans AI drafting but the transcript shows the AI writing full sentences or paragraphs that plausibly ended up in the submission, or the syllabus requires disclosure and the transcript shows AI help the student didn't disclose elsewhere. Never flag a concern just because the transcript doesn't prove the student met some other requirement (number of sources, word count, formatting, etc.) — those aren't AI-use questions, they're separate grading matters outside what this tool checks, and "I can't verify this from the transcript" is not evidence of a violation. If you don't see a clear, transcript-evidenced AI-use violation, report policy_concern as an empty string.
 
+Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) naming exactly what the AI did that breaks which rule. what_it_tests is a few words. No hedging, no restating the syllabus.
+
 Report your findings using the submit_quiz tool. Don't write any other text.`;
 
 export type QuizResult = {
@@ -42,11 +44,11 @@ const QUIZ_TOOL: Anthropic.Tool = {
     properties: {
       policy_summary: {
         type: "string",
-        description: "Plain-language summary of what the syllabus allows/requires for AI use.",
+        description: "One sentence, under 20 words: what the syllabus allows/forbids for AI use.",
       },
       policy_concern: {
         type: "string",
-        description: "A short note on a clear, transcript-evidenced AI-use policy violation only (e.g. AI drafted text despite a no-drafting rule, or undisclosed AI help). Empty string otherwise — never flag just because something can't be verified from the transcript, like source or word counts.",
+        description: "One sentence, under 25 words, naming a clear, transcript-evidenced AI-use violation (e.g. AI drafted text despite a no-drafting rule). Empty string otherwise — never flag just because something can't be verified from the transcript, like source or word counts.",
       },
       claimed_unassisted_areas: {
         type: "array",
@@ -62,7 +64,7 @@ const QUIZ_TOOL: Anthropic.Tool = {
           properties: {
             question: { type: "string" },
             expected_length: { type: "string", enum: ["one_sentence", "two_sentences"] },
-            what_it_tests: { type: "string", description: "Short note on the specific gap this question targets." },
+            what_it_tests: { type: "string", description: "A few words: the specific gap this question targets." },
           },
           required: ["question", "expected_length", "what_it_tests"],
         },
