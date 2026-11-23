@@ -79,6 +79,19 @@ export default function SubmissionsClient() {
     setSubmissions(data.submissions);
   }
 
+  async function dismissSubmission(id: number) {
+    const res = await fetch(`/api/classes/${params.id}/submissions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cleared" }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    setSubmissions((prev) =>
+      prev ? prev.map((s) => (s.id === id ? { ...s, status: data.submission.status } : s)) : prev
+    );
+  }
+
   const flagged = submissions?.filter((s) => s.status === "flagged") ?? [];
   const rest = submissions?.filter((s) => s.status !== "flagged") ?? [];
 
@@ -150,7 +163,7 @@ export default function SubmissionsClient() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   {flagged.map((s) => (
-                    <SubmissionRow key={s.id} s={s} />
+                    <SubmissionRow key={s.id} s={s} onDismiss={dismissSubmission} />
                   ))}
                 </div>
               )}
@@ -176,7 +189,7 @@ export default function SubmissionsClient() {
                 {showAll && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {rest.map((s) => (
-                      <SubmissionRow key={s.id} s={s} />
+                      <SubmissionRow key={s.id} s={s} onDismiss={dismissSubmission} />
                     ))}
                   </div>
                 )}
@@ -189,7 +202,7 @@ export default function SubmissionsClient() {
   );
 }
 
-function SubmissionRow({ s }: { s: Submission }) {
+function SubmissionRow({ s, onDismiss }: { s: Submission; onDismiss: (id: number) => void }) {
   const badge = statusBadge(s.status);
   const [open, setOpen] = useState(false);
 
@@ -284,6 +297,24 @@ function SubmissionRow({ s }: { s: Submission }) {
                 ))}
               </div>
             </div>
+          )}
+          {s.status === "flagged" && (
+            <button
+              onClick={() => onDismiss(s.id)}
+              style={{
+                background: colors.ink,
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "7px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                alignSelf: "flex-start",
+              }}
+            >
+              Dismiss — mark cleared
+            </button>
           )}
         </div>
       )}
