@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { generateQuiz } from "@/src/lib/quiz";
+import { scoreSubmission } from "@/src/lib/scoring";
+import { nextStatus, forStudent } from "@/src/lib/grading";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/submit">) {
   const session = await getCurrentStudentSession();
@@ -35,7 +37,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
     .first();
   if (existing) {
     return NextResponse.json(
-      { error: "You've already submitted this assignment.", submission: existing },
+      { error: "You've already submitted this assignment.", submission: forStudent(existing) },
       { status: 409 }
     );
   }
@@ -76,13 +78,14 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
 
   let quiz;
   try {
-    quiz = await generateQuiz(transcript, combinedPolicy);
+    quiz = await generateQuiz(transcript, combinedPolicy, assignmentText);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not generate your quiz.";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
-  const status = quiz.policy_concern ? "flagged" : "submitted";
+  const scoreCard = scoreSubmission({ quiz, submissionText: assignmentText, transcript });
+  const status = nextStatus("submitted", scoreCard, false);
 
   const created = await db.orm.public.Submission.create({
     assignmentId: id,
@@ -92,8 +95,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
     assignmentText,
     transcript,
     quiz,
+    reportCard: { scoreCard },
     status,
   });
 
-  return NextResponse.json({ submission: created }, { status: 201 });
+  return NextResponse.json({ submission: forStudent(created) }, { status: 201 });
 }

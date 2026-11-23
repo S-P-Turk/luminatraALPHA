@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
-import { gradeIfNeeded } from "@/src/lib/grading";
+import { gradeIfNeeded, forStudent } from "@/src/lib/grading";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/answer">) {
   const session = await getCurrentStudentSession();
@@ -49,6 +49,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
   const graded = await gradeIfNeeded({ ...submission, quizAnswers: answers });
 
   return NextResponse.json({
-    submission: { ...submission, quizAnswers: answers, reportCard: graded.reportCard, status: graded.status },
+    submission: forStudent({ ...submission, quizAnswers: answers, reportCard: graded.reportCard, status: graded.status }),
   });
 }

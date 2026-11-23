@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
 
-// Lets a teacher dismiss a flagged submission (mark it cleared) once they've
-// reviewed it and decided it's not actually a problem.
+// Records the teacher's decision on a submission: "cleared" (no follow-up
+// needed) or "follow_up" (they'll talk to the student). These decisions are
+// the labels used to measure and tune the scoring layer.
 export async function PATCH(
   request: Request,
   ctx: RouteContext<"/api/classes/[id]/submissions/[submissionId]">
@@ -38,8 +39,8 @@ export async function PATCH(
   }
 
   const status = (body as { status?: unknown })?.status;
-  if (status !== "cleared") {
-    return NextResponse.json({ error: "status must be 'cleared'." }, { status: 400 });
+  if (status !== "cleared" && status !== "follow_up") {
+    return NextResponse.json({ error: "status must be 'cleared' or 'follow_up'." }, { status: 400 });
   }
 
   const updated = await db.orm.public.Submission
@@ -57,7 +58,7 @@ export async function PATCH(
       "createdAt",
       "updatedAt"
     )
-    .update({ status: "cleared" });
+    .update({ status });
 
   return NextResponse.json({ submission: updated });
 }

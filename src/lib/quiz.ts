@@ -5,9 +5,10 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Kept identical in spirit to the original app/api/generate-quiz prototype
 // prompt — pulled out here so the real student-submission flow and the
 // /dev/quiz-test page can both generate a quiz the same way.
-const SYSTEM_PROMPT = `You are part of an academic integrity tool. A student has submitted two things:
+const SYSTEM_PROMPT = `You are part of an academic integrity tool. A student has submitted three things:
 1. A transcript of their AI conversation(s) while working on an assignment.
 2. The course syllabus, which states the professor's rules for AI use on this assignment.
+3. The work they actually submitted (may be missing for older test calls).
 
 Your job, in order:
 
@@ -21,6 +22,10 @@ Your job, in order:
 
 4. Only report a policy_concern if the transcript affirmatively shows the AI being used in a way the syllabus doesn't allow — for example, the syllabus bans AI drafting but the transcript shows the AI writing full sentences or paragraphs that plausibly ended up in the submission, or the syllabus requires disclosure and the transcript shows AI help the student didn't disclose elsewhere. Never flag a concern just because the transcript doesn't prove the student met some other requirement (number of sources, word count, formatting, etc.) — those aren't AI-use questions, they're separate grading matters outside what this tool checks, and "I can't verify this from the transcript" is not evidence of a violation. If you don't see a clear, transcript-evidenced AI-use violation, report policy_concern as an empty string.
 
+5. Set policy_severity: "none" if there's no policy_concern; "minor" if the concern is borderline or small in scope (e.g. light AI rewording where the rule is ambiguous); "clear" if the transcript plainly shows AI use the syllabus forbids.
+
+6. If the submitted work is provided, list in ai_passages every passage of the submitted work that appears to have been written by the AI in the transcript (copied or lightly edited from an AI response — NOT text the student wrote and pasted into the chat themselves). For each, give submission_excerpt copied EXACTLY, character for character, from the submitted work (at least 8 words; split long passages into separate entries of up to ~60 words), and claimed_as_own: true if the transcript/disclosure presents that part as the student's own work or doesn't disclose it, false if the student openly disclosed that the AI wrote it. If there are none, return an empty list. Excerpts are verified mechanically against the submission and transcript, so never paraphrase them.
+
 Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) describing what in the transcript a teacher should follow up on and which rule it relates to. Never state a conclusion or accuse — the teacher decides; you only point to what is worth a closer look. what_it_tests is a few words. No hedging, no restating the syllabus.
 
 Report your findings using the submit_quiz tool. Don't write any other text.`;
@@ -28,6 +33,9 @@ Report your findings using the submit_quiz tool. Don't write any other text.`;
 export type QuizResult = {
   policy_summary: string;
   policy_concern: string | null;
+  // Added with the scoring layer; absent on submissions analyzed before it.
+  policy_severity?: "none" | "minor" | "clear";
+  ai_passages?: { submission_excerpt: string; claimed_as_own: boolean }[];
   claimed_unassisted_areas: string[];
   quiz: { question: string; expected_length: "one_sentence" | "two_sentences"; what_it_tests: string }[];
 };
@@ -50,6 +58,19 @@ const QUIZ_TOOL: Anthropic.Tool = {
         type: "string",
         description: "One sentence, under 25 words, describing transcript-evidenced AI use worth a teacher follow-up and the rule it relates to (e.g. AI appears to draft text where the syllabus bans drafting). Neutral wording, no verdict. Empty string otherwise — never flag just because something can't be verified from the transcript, like source or word counts.",
       },
+      policy_severity: { type: "string", enum: ["none", "minor", "clear"] },
+      ai_passages: {
+        type: "array",
+        description: "Passages of the submitted work that appear AI-written, copied exactly from the submission.",
+        items: {
+          type: "object",
+          properties: {
+            submission_excerpt: { type: "string" },
+            claimed_as_own: { type: "boolean" },
+          },
+          required: ["submission_excerpt", "claimed_as_own"],
+        },
+      },
       claimed_unassisted_areas: {
         type: "array",
         items: { type: "string" },
@@ -70,23 +91,28 @@ const QUIZ_TOOL: Anthropic.Tool = {
         },
       },
     },
-    required: ["policy_summary", "policy_concern", "claimed_unassisted_areas", "quiz"],
+    required: ["policy_summary", "policy_concern", "policy_severity", "ai_passages", "claimed_unassisted_areas", "quiz"],
   },
 };
 
-export async function generateQuiz(transcript: string, syllabus: string): Promise<QuizResult> {
+export async function generateQuiz(transcript: string, syllabus: string, submissionText?: string): Promise<QuizResult> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("Server is missing ANTHROPIC_API_KEY.");
   }
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 2048,
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
     tools: [QUIZ_TOOL],
     tool_choice: { type: "tool", name: "submit_quiz" },
     messages: [
-      { role: "user", content: `SYLLABUS:\n${syllabus}\n\n---\n\nAI TRANSCRIPT:\n${transcript}` },
+      {
+        role: "user",
+        content:
+          `SYLLABUS:\n${syllabus}\n\n---\n\nAI TRANSCRIPT:\n${transcript}` +
+          (submissionText ? `\n\n---\n\nSUBMITTED WORK:\n${submissionText}` : ""),
+      },
     ],
   });
 

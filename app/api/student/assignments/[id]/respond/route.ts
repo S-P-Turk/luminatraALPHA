@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
+import { forStudent } from "@/src/lib/grading";
 
 // A flagged submission is shown to the student before the teacher sees it —
 // this is where they can add context/justification in response.
@@ -44,5 +45,5 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
     .where({ id: submission.id })
     .update({ studentResponse });
 
-  return NextResponse.json({ submission: updated });
+  return NextResponse.json({ submission: updated ? forStudent(updated) : null });
 }

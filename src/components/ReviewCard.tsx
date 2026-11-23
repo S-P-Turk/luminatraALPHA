@@ -1,6 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import type { ScoreCard } from "@/src/lib/scoring";
+
+export const SIGNAL_LABELS = {
+  textMatch: "AI text in submission",
+  policy: "Syllabus AI rules",
+  comprehension: "Comprehension check",
+} as const;
+
+export function scoreOf(s: { reportCard?: { scoreCard?: ScoreCard } | null }): number | null {
+  return s.reportCard?.scoreCard?.score ?? null;
+}
 
 // One compact review card, shared by the per-class submissions page and the
 // all-classes /review page so the teacher sees the same thing everywhere.
@@ -23,6 +34,7 @@ export type ReviewSubmission = {
   studentResponse: string | null;
   reportCard?: {
     comprehension?: { passed: boolean; note: string; per_question?: { adequate: boolean; reason: string }[] };
+    scoreCard?: ScoreCard;
   } | null;
   status: string;
   createdAt: string;
@@ -53,14 +65,18 @@ export const colors = {
 function badgeFor(status: string) {
   if (status === "flagged") return { label: "Needs review", bg: colors.amberBg, fg: colors.amber };
   if (status === "cleared") return { label: "Cleared", bg: "#E7F1EB", fg: colors.green };
+  if (status === "follow_up") return { label: "Following up", bg: "#E8ECF5", fg: "#3B5A8A" };
   return { label: "Clean", bg: "#EFEDE6", fg: colors.muted };
 }
 
-export async function clearSubmission(s: ReviewSubmission): Promise<string | null> {
+export async function decideSubmission(
+  s: ReviewSubmission,
+  status: "cleared" | "follow_up"
+): Promise<string | null> {
   const res = await fetch(`/api/classes/${s.classId}/submissions/${s.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "cleared" }),
+    body: JSON.stringify({ status }),
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -78,15 +94,16 @@ export function ReviewCard({
   const [open, setOpen] = useState(false);
   const [showRule, setShowRule] = useState(false);
   const [busy, setBusy] = useState(false);
+  const card = s.reportCard?.scoreCard;
 
   const questions = s.quiz?.quiz ?? [];
   const answered = questions.length > 0 && questions.every((_, i) => s.quizAnswers?.[i]);
   const reasons = flagReasons(s);
   const comprehension = s.reportCard?.comprehension;
 
-  async function handleClear() {
+  async function decide(next: "cleared" | "follow_up") {
     setBusy(true);
-    const status = await clearSubmission(s);
+    const status = await decideSubmission(s, next);
     setBusy(false);
     if (status) onCleared(s.id, status);
   }
@@ -116,25 +133,42 @@ export function ReviewCard({
             {s.assignmentTitle} · {new Date(s.createdAt).toLocaleDateString()}
           </div>
           {!open && s.status === "flagged" &&
-            reasons.map((f) => (
+            (card
+              ? (Object.keys(SIGNAL_LABELS) as (keyof typeof SIGNAL_LABELS)[])
+                  .filter((k) => card.signals[k].points > 0 && card.signals[k].reason)
+                  .map((k) => ({ label: SIGNAL_LABELS[k], text: card.signals[k].reason }))
+              : reasons
+            ).map((f) => (
               <div key={f.label} style={{ fontSize: 13, color: colors.amber, marginTop: 4 }}>
                 <strong>{f.label}:</strong> {f.text}
               </div>
             ))}
         </div>
-        <span
-          style={{
-            flexShrink: 0,
-            fontSize: 12,
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: 999,
-            background: badge.bg,
-            color: badge.fg,
-          }}
-        >
-          {badge.label}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {card && (
+            <span
+              title="Follow-up priority: how strongly the signals suggest a closer look. Not a probability of cheating."
+              style={{ textAlign: "right", lineHeight: 1.1 }}
+            >
+              <span style={{ fontSize: 18, fontWeight: 700, color: card.needsReview ? colors.amber : colors.muted }}>
+                {card.score}
+              </span>
+              <span style={{ display: "block", fontSize: 10, color: colors.muted }}>follow-up priority</span>
+            </span>
+          )}
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: badge.bg,
+              color: badge.fg,
+            }}
+          >
+            {badge.label}
+          </span>
+        </div>
       </button>
 
       {open && (
@@ -149,15 +183,49 @@ export function ReviewCard({
             fontSize: 13,
           }}
         >
-          {reasons.map((f) => (
-            <div
-              key={f.label}
-              style={{ background: colors.amberBg, borderRadius: 8, padding: "8px 12px", color: colors.ink }}
-            >
-              <strong style={{ color: colors.amber }}>{f.label}: </strong>
-              {f.text}
+          {card ? (
+            <div style={{ border: `1px solid ${colors.border}`, borderRadius: 8, padding: "10px 12px" }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                Follow-up priority {card.score}/100{" "}
+                <span style={{ fontWeight: 400, color: colors.muted }}>
+                  — suggests where to look; you decide.
+                </span>
+              </div>
+              {(Object.keys(SIGNAL_LABELS) as (keyof typeof SIGNAL_LABELS)[]).map((k) => {
+                const sig = card.signals[k];
+                return (
+                  <div key={k} style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <span
+                      style={{
+                        width: 52,
+                        flexShrink: 0,
+                        fontWeight: 700,
+                        color: sig.points > 0 ? colors.amber : colors.muted,
+                      }}
+                    >
+                      {sig.pending ? "—" : `${sig.points}/${sig.max}`}
+                    </span>
+                    <span>
+                      <strong>{SIGNAL_LABELS[k]}:</strong>{" "}
+                      <span style={{ color: sig.reason ? colors.ink : colors.muted }}>
+                        {sig.pending ? "Quiz not answered yet." : sig.reason || "Nothing notable."}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          ) : (
+            reasons.map((f) => (
+              <div
+                key={f.label}
+                style={{ background: colors.amberBg, borderRadius: 8, padding: "8px 12px", color: colors.ink }}
+              >
+                <strong style={{ color: colors.amber }}>{f.label}: </strong>
+                {f.text}
+              </div>
+            ))
+          )}
 
           {questions.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -207,9 +275,9 @@ export function ReviewCard({
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            {s.status === "flagged" && (
+            {s.status !== "follow_up" && (
               <button
-                onClick={handleClear}
+                onClick={() => decide("follow_up")}
                 disabled={busy}
                 style={{
                   background: colors.ink,
@@ -222,7 +290,25 @@ export function ReviewCard({
                   cursor: busy ? "default" : "pointer",
                 }}
               >
-                {busy ? "Clearing..." : "Mark cleared"}
+                I&apos;ll follow up
+              </button>
+            )}
+            {s.status !== "cleared" && (
+              <button
+                onClick={() => decide("cleared")}
+                disabled={busy}
+                style={{
+                  background: "#fff",
+                  color: colors.ink,
+                  border: `1px solid ${colors.cardBorder}`,
+                  borderRadius: 6,
+                  padding: "7px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: busy ? "default" : "pointer",
+                }}
+              >
+                Mark cleared
               </button>
             )}
             {s.quiz?.policy_summary && (

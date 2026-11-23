@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ReviewCard, colors, type ReviewSubmission } from "./ReviewCard";
+import { ReviewCard, colors, scoreOf, type ReviewSubmission } from "./ReviewCard";
 
 export function ReviewList({
   title,
@@ -20,8 +20,11 @@ export function ReviewList({
   setShowAll: (fn: (v: boolean) => boolean) => void;
   onCleared: (id: number, status: string) => void;
 }) {
-  const flagged = submissions?.filter((s) => s.status === "flagged") ?? [];
-  const rest = submissions?.filter((s) => s.status !== "flagged") ?? [];
+  // Highest follow-up priority first; unscored ones last.
+  const byScore = (a: ReviewSubmission, b: ReviewSubmission) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1);
+  const flagged = (submissions?.filter((s) => s.status === "flagged") ?? []).sort(byScore);
+  const followingUp = (submissions?.filter((s) => s.status === "follow_up") ?? []).sort(byScore);
+  const rest = (submissions?.filter((s) => s.status !== "flagged" && s.status !== "follow_up") ?? []).sort(byScore);
 
   return (
     <main
@@ -88,6 +91,19 @@ export function ReviewList({
                 </div>
               )}
             </div>
+
+            {followingUp.length > 0 && (
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 10px" }}>
+                  Following up ({followingUp.length})
+                </h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {followingUp.map((s) => (
+                    <ReviewCard key={s.id} s={s} onCleared={onCleared} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {rest.length > 0 && (
               <div>

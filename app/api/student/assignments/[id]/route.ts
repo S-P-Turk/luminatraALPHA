@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
+import { forStudent } from "@/src/lib/grading";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/student/assignments/[id]">) {
   const session = await getCurrentStudentSession();
@@ -52,6 +53,6 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/ass
       open: assignment.open,
       quizOpen: assignment.quizOpen,
     },
-    submission: visibleSubmission ?? null,
+    submission: visibleSubmission ? forStudent(visibleSubmission) : null,
   });
 }
