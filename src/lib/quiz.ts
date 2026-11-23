@@ -19,7 +19,7 @@ Your job, in order:
    - Question 1 must be answerable correctly in one sentence.
    - Question 2 must be answerable correctly in two sentences.
 
-4. Note any apparent mismatch between the syllabus rules and what the transcript shows the student doing (for example, the syllabus bans AI drafting but the transcript shows the AI writing full paragraphs). If there's no mismatch, report policy_concern as an empty string.
+4. Only report a policy_concern if the transcript affirmatively shows the AI being used in a way the syllabus doesn't allow — for example, the syllabus bans AI drafting but the transcript shows the AI writing full sentences or paragraphs that plausibly ended up in the submission, or the syllabus requires disclosure and the transcript shows AI help the student didn't disclose elsewhere. Never flag a concern just because the transcript doesn't prove the student met some other requirement (number of sources, word count, formatting, etc.) — those aren't AI-use questions, they're separate grading matters outside what this tool checks, and "I can't verify this from the transcript" is not evidence of a violation. If you don't see a clear, transcript-evidenced AI-use violation, report policy_concern as an empty string.
 
 Report your findings using the submit_quiz tool. Don't write any other text.`;
 
@@ -46,7 +46,7 @@ const QUIZ_TOOL: Anthropic.Tool = {
       },
       policy_concern: {
         type: "string",
-        description: "A short note on any mismatch between stated policy and what the transcript shows. Empty string if there's no concern.",
+        description: "A short note on a clear, transcript-evidenced AI-use policy violation only (e.g. AI drafted text despite a no-drafting rule, or undisclosed AI help). Empty string otherwise — never flag just because something can't be verified from the transcript, like source or word counts.",
       },
       claimed_unassisted_areas: {
         type: "array",
