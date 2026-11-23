@@ -4,6 +4,10 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
+    "Assignment": {
+      "model": "Assignment",
+      "namespace": "public"
+    },
     "Class": {
       "model": "Class",
       "namespace": "public"
@@ -25,6 +29,112 @@
     "namespaces": {
       "public": {
         "models": {
+          "Assignment": {
+            "fields": {
+              "classId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "instructions": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "open": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "class": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "classId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Class",
+                  "namespace": "public"
+                }
+              },
+              "submissions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "assignmentId"
+                  ]
+                },
+                "to": {
+                  "model": "Submission",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "classId": {
+                  "column": "classId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "instructions": {
+                  "column": "instructions"
+                },
+                "open": {
+                  "column": "open"
+                },
+                "title": {
+                  "column": "title"
+                }
+              },
+              "namespaceId": "public",
+              "table": "Assignment"
+            }
+          },
           "Class": {
             "fields": {
               "createdAt": {
@@ -81,6 +191,21 @@
               }
             },
             "relations": {
+              "assignments": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "classId"
+                  ]
+                },
+                "to": {
+                  "model": "Assignment",
+                  "namespace": "public"
+                }
+              },
               "enrollments": {
                 "cardinality": "1:N",
                 "on": {
@@ -239,6 +364,13 @@
           },
           "Submission": {
             "fields": {
+              "assignmentId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "assignmentText": {
                 "nullable": false,
                 "type": {
@@ -338,6 +470,22 @@
               }
             },
             "relations": {
+              "assignment": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "assignmentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Assignment",
+                  "namespace": "public"
+                }
+              },
               "class": {
                 "cardinality": "N:1",
                 "nullable": false,
@@ -357,6 +505,9 @@
             },
             "storage": {
               "fields": {
+                "assignmentId": {
+                  "column": "assignmentId"
+                },
                 "assignmentText": {
                   "column": "assignmentText"
                 },
@@ -470,6 +621,92 @@
       "public": {
         "entries": {
           "table": {
+            "Assignment": {
+              "columns": {
+                "classId": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nullable": false
+                },
+                "instructions": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "open": {
+                  "codecId": "pg/bool@1",
+                  "dataType": "pg/bool",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nullable": false
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "Assignment_classId_idx_0089e5e7"
+                  },
+                  "source": {
+                    "columns": [
+                      "classId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Assignment"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Class"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "classId"
+                  ],
+                  "name": "Assignment_classId_idx_0089e5e7",
+                  "prefix": "Assignment_classId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "Class": {
               "columns": {
                 "createdAt": {
@@ -653,6 +890,11 @@
             },
             "Submission": {
               "columns": {
+                "assignmentId": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "nullable": false
+                },
                 "assignmentText": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -740,6 +982,25 @@
               "foreignKeys": [
                 {
                   "index": {
+                    "name": "Submission_assignmentId_idx_8cfb4ac4"
+                  },
+                  "source": {
+                    "columns": [
+                      "assignmentId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Submission"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Assignment"
+                  }
+                },
+                {
+                  "index": {
                     "name": "Submission_classId_idx_0089e5e7"
                   },
                   "source": {
@@ -761,6 +1022,14 @@
               "indexes": [
                 {
                   "columns": [
+                    "assignmentId"
+                  ],
+                  "name": "Submission_assignmentId_idx_8cfb4ac4",
+                  "prefix": "Submission_assignmentId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
                     "classId"
                   ],
                   "name": "Submission_classId_idx_0089e5e7",
@@ -773,7 +1042,14 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "assignmentId",
+                    "studentEmail"
+                  ]
+                }
+              ]
             },
             "Teacher": {
               "columns": {
@@ -825,12 +1101,26 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6dd458f807d89a091df327f2a4c8c42c6df402ae34f663fca8c51d719624f1f9"
+    "storageHash": "7220137619530a6beac312a83cd4f11135761f323bba7a891aa6db3eb6872e90"
   },
   "execution": {
-    "executionHash": "a550fa130c2525562dafd2af89dce57ab7a4e96cebb4d064027a9e6fb798fba9",
+    "executionHash": "d64c2479453df4139d4052f82d7bf48ec1e8e8e4cfc5f4156a06169ff7f744ca",
     "mutations": {
       "defaults": [
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator",
+            "params": {
+              "precision": 3
+            }
+          },
+          "ref": {
+            "entry": "Assignment",
+            "field": "createdAt",
+            "namespace": "public"
+          }
+        },
         {
           "onCreate": {
             "id": "timestampNow",

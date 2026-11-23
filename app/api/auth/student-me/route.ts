@@ -17,26 +17,38 @@ export async function GET() {
   for (const enrollment of enrollments) {
     const cls = await db.orm.public.Class
       .where({ id: enrollment.classId })
-      .select("id", "name", "quizOpen")
+      .select("id", "name")
       .first();
     if (!cls) continue;
 
-    const submission = await db.orm.public.Submission
-      .where({ classId: cls.id, studentEmail: session.email })
-      .select("id", "status", "quiz", "quizAnswers", "studentResponse")
-      .first();
+    const assignments = await db.orm.public.Assignment
+      .where({ classId: cls.id })
+      .select("id", "open")
+      .all();
+
+    let openUnsubmitted = 0;
+    let needsResponse = 0;
+    let needsAnswers = 0;
+    for (const a of assignments) {
+      const submission = await db.orm.public.Submission
+        .where({ assignmentId: a.id, studentEmail: session.email })
+        .select("status", "quiz", "quizAnswers", "studentResponse")
+        .first();
+      if (!submission) {
+        if (a.open) openUnsubmitted++;
+        continue;
+      }
+      if (submission.status === "flagged" && submission.studentResponse == null) needsResponse++;
+      else if (submission.quiz != null && submission.quizAnswers == null) needsAnswers++;
+    }
 
     classes.push({
-      ...cls,
-      submission: submission
-        ? {
-            id: submission.id,
-            status: submission.status,
-            hasQuiz: submission.quiz != null,
-            hasAnswers: submission.quizAnswers != null,
-            hasResponded: submission.studentResponse != null,
-          }
-        : null,
+      id: cls.id,
+      name: cls.name,
+      totalAssignments: assignments.length,
+      openUnsubmitted,
+      needsResponse,
+      needsAnswers,
     });
   }
 

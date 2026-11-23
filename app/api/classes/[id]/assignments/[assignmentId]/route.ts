@@ -1,0 +1,48 @@
+import { NextResponse } from "next/server";
+import { db } from "@/src/prisma/db";
+import { getCurrentTeacher } from "@/src/lib/current-teacher";
+
+export async function PATCH(
+  request: Request,
+  ctx: RouteContext<"/api/classes/[id]/assignments/[assignmentId]">
+) {
+  const teacher = await getCurrentTeacher();
+  if (!teacher) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const { id: idParam, assignmentId: assignmentIdParam } = await ctx.params;
+  const classId = Number(idParam);
+  const assignmentId = Number(assignmentIdParam);
+  if (!Number.isInteger(classId) || !Number.isInteger(assignmentId)) {
+    return NextResponse.json({ error: "Invalid id." }, { status: 400 });
+  }
+
+  const cls = await db.orm.public.Class.where({ id: classId, teacherId: teacher.id }).first();
+  if (!cls) {
+    return NextResponse.json({ error: "Class not found." }, { status: 404 });
+  }
+
+  const assignment = await db.orm.public.Assignment.where({ id: assignmentId, classId }).first();
+  if (!assignment) {
+    return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Expected JSON body." }, { status: 400 });
+  }
+
+  const openRaw = (body as { open?: unknown })?.open;
+  if (typeof openRaw !== "boolean") {
+    return NextResponse.json({ error: "open must be a boolean." }, { status: 400 });
+  }
+
+  const updated = await db.orm.public.Assignment
+    .where({ id: assignmentId })
+    .update({ open: openRaw });
+
+  return NextResponse.json({ assignment: updated });
+}

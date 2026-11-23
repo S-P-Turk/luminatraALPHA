@@ -7,14 +7,10 @@ import Link from "next/link";
 type ClassSummary = {
   id: number;
   name: string;
-  quizOpen: boolean;
-  submission: {
-    id: number;
-    status: string;
-    hasQuiz: boolean;
-    hasAnswers: boolean;
-    hasResponded: boolean;
-  } | null;
+  totalAssignments: number;
+  openUnsubmitted: number;
+  needsResponse: number;
+  needsAnswers: number;
 };
 
 const colors = {
@@ -30,21 +26,19 @@ const colors = {
 };
 
 function statusLabel(cls: ClassSummary): { text: string; bg: string; fg: string } {
-  if (!cls.submission) {
-    return cls.quizOpen
-      ? { text: "Open — not submitted", bg: colors.amberBg, fg: colors.amber }
-      : { text: "Waiting to open", bg: "#EFEDE6", fg: colors.muted };
+  if (cls.needsResponse > 0) {
+    return { text: `Needs your response (${cls.needsResponse})`, bg: colors.amberBg, fg: colors.amber };
   }
-  if (cls.submission.status === "flagged" && !cls.submission.hasResponded) {
-    return { text: "Needs your response", bg: colors.amberBg, fg: colors.amber };
+  if (cls.needsAnswers > 0) {
+    return { text: `Quiz ready (${cls.needsAnswers})`, bg: colors.amberBg, fg: colors.amber };
   }
-  if (cls.submission.status === "flagged") {
-    return { text: "Flagged — awaiting teacher", bg: colors.amberBg, fg: colors.amber };
+  if (cls.openUnsubmitted > 0) {
+    return { text: `${cls.openUnsubmitted} open assignment${cls.openUnsubmitted === 1 ? "" : "s"}`, bg: colors.amberBg, fg: colors.amber };
   }
-  if (!cls.submission.hasAnswers) {
-    return { text: "Quiz ready — answer it", bg: colors.amberBg, fg: colors.amber };
+  if (cls.totalAssignments === 0) {
+    return { text: "No assignments yet", bg: "#EFEDE6", fg: colors.muted };
   }
-  return { text: "Submitted", bg: "#E7F1EB", fg: colors.green };
+  return { text: "All caught up", bg: "#E7F1EB", fg: colors.green };
 }
 
 export default function StudentHomePage() {

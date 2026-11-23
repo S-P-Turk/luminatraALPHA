@@ -21,7 +21,24 @@ model Class {
   teacherId      Int
   submissions    Submission[]
   enrollments    Enrollment[]
+  assignments    Assignment[]
   createdAt      DateTime     @default(now()) @onCreate(now())
+}
+
+// A specific piece of work within a class — "Essay 1", "Reading journal
+// week 3", etc. Governed by the class's own syllabusText (that's the single
+// source of AI-use rules); an assignment just adds what the student is
+// actually being asked to do, and whether it's currently open for
+// submission.
+model Assignment {
+  id           Int          @id @default(autoincrement())
+  class        Class        @relation(fields: [classId], references: [id])
+  classId      Int
+  title        String
+  instructions String
+  open         Boolean      @default(false)
+  submissions  Submission[]
+  createdAt    DateTime     @default(now()) @onCreate(now())
 }
 
 // A student's membership in a class. Students have no password-based
@@ -40,8 +57,10 @@ model Enrollment {
 }
 
 model Submission {
-  id              Int      @id @default(autoincrement())
-  class           Class    @relation(fields: [classId], references: [id])
+  id              Int        @id @default(autoincrement())
+  assignment      Assignment @relation(fields: [assignmentId], references: [id])
+  assignmentId    Int
+  class           Class      @relation(fields: [classId], references: [id])
   classId         Int
   studentName     String
   studentEmail    String
@@ -51,7 +70,9 @@ model Submission {
   quizAnswers     Json?
   reportCard      Json?
   studentResponse String?
-  status          String   @default("submitted")
-  createdAt       DateTime @default(now()) @onCreate(now())
+  status          String     @default("submitted")
+  createdAt       DateTime   @default(now()) @onCreate(now())
   updatedAt       temporal.UpdatedAt
+
+  @@unique([assignmentId, studentEmail])
 }

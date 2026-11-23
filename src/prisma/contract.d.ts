@@ -18,9 +18,9 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'6dd458f807d89a091df327f2a4c8c42c6df402ae34f663fca8c51d719624f1f9'>;
+  StorageHashBase<'7220137619530a6beac312a83cd4f11135761f323bba7a891aa6db3eb6872e90'>;
 export type ExecutionHash =
-  ExecutionHashBase<'a550fa130c2525562dafd2af89dce57ab7a4e96cebb4d064027a9e6fb798fba9'>;
+  ExecutionHashBase<'d64c2479453df4139d4052f82d7bf48ec1e8e8e4cfc5f4156a06169ff7f744ca'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -304,6 +304,17 @@ export type StorageColumnInputTypes = ColumnTypesFromStorage<
 >;
 
 export namespace Models {
+  export type public_Assignment = {
+    classId: FieldOutputTypes['public']['Assignment']['classId'];
+    createdAt: FieldOutputTypes['public']['Assignment']['createdAt'];
+    id: FieldOutputTypes['public']['Assignment']['id'];
+    instructions: FieldOutputTypes['public']['Assignment']['instructions'];
+    open: FieldOutputTypes['public']['Assignment']['open'];
+    title: FieldOutputTypes['public']['Assignment']['title'];
+    class: public_Class;
+    submissions: public_Submission[];
+    readonly [RelationKeys]?: 'class' | 'submissions';
+  };
   export type public_Class = {
     createdAt: FieldOutputTypes['public']['Class']['createdAt'];
     id: FieldOutputTypes['public']['Class']['id'];
@@ -312,10 +323,11 @@ export namespace Models {
     quizOpen: FieldOutputTypes['public']['Class']['quizOpen'];
     syllabusText: FieldOutputTypes['public']['Class']['syllabusText'];
     teacherId: FieldOutputTypes['public']['Class']['teacherId'];
+    assignments: public_Assignment[];
     enrollments: public_Enrollment[];
     submissions: public_Submission[];
     teacher: public_Teacher;
-    readonly [RelationKeys]?: 'enrollments' | 'submissions' | 'teacher';
+    readonly [RelationKeys]?: 'assignments' | 'enrollments' | 'submissions' | 'teacher';
   };
   export type public_Enrollment = {
     classId: FieldOutputTypes['public']['Enrollment']['classId'];
@@ -327,6 +339,7 @@ export namespace Models {
     readonly [RelationKeys]?: 'class';
   };
   export type public_Submission = {
+    assignmentId: FieldOutputTypes['public']['Submission']['assignmentId'];
     assignmentText: FieldOutputTypes['public']['Submission']['assignmentText'];
     classId: FieldOutputTypes['public']['Submission']['classId'];
     createdAt: FieldOutputTypes['public']['Submission']['createdAt'];
@@ -340,8 +353,9 @@ export namespace Models {
     studentResponse: FieldOutputTypes['public']['Submission']['studentResponse'];
     transcript: FieldOutputTypes['public']['Submission']['transcript'];
     updatedAt: FieldOutputTypes['public']['Submission']['updatedAt'];
+    assignment: public_Assignment;
     class: public_Class;
-    readonly [RelationKeys]?: 'class';
+    readonly [RelationKeys]?: 'assignment' | 'class';
   };
   export type public_Teacher = {
     createdAt: FieldOutputTypes['public']['Teacher']['createdAt'];
@@ -354,6 +368,7 @@ export namespace Models {
 
 export declare const models: {
   public: {
+    Assignment: Models.public_Assignment;
     Class: Models.public_Class;
     Enrollment: Models.public_Enrollment;
     Submission: Models.public_Submission;
@@ -379,6 +394,80 @@ type ContractBase = Omit<
         readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
+            readonly Assignment: {
+              columns: {
+                readonly classId: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly createdAt: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly id: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                  readonly many: false;
+                };
+                readonly instructions: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly open: {
+                  readonly dataType: 'pg/bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', false>;
+                  };
+                  readonly many: false;
+                };
+                readonly title: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'Assignment_classId_idx_0089e5e7';
+                  readonly prefix: 'Assignment_classId_idx';
+                  readonly columns: readonly ['classId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Assignment';
+                    readonly columns: readonly ['classId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Class';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
             readonly Class: {
               columns: {
                 readonly createdAt: {
@@ -525,6 +614,12 @@ type ContractBase = Omit<
             };
             readonly Submission: {
               columns: {
+                readonly assignmentId: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
                 readonly assignmentText: {
                   readonly dataType: 'pg/text';
                   readonly codecId: 'pg/text@1';
@@ -616,8 +711,14 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [{ readonly columns: readonly ['assignmentId', 'studentEmail'] }];
               indexes: readonly [
+                {
+                  readonly name: 'Submission_assignmentId_idx_8cfb4ac4';
+                  readonly prefix: 'Submission_assignmentId_idx';
+                  readonly columns: readonly ['assignmentId'];
+                  readonly unique: false;
+                },
                 {
                   readonly name: 'Submission_classId_idx_0089e5e7';
                   readonly prefix: 'Submission_classId_idx';
@@ -626,6 +727,18 @@ type ContractBase = Omit<
                 },
               ];
               foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Submission';
+                    readonly columns: readonly ['assignmentId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'public' & NamespaceId;
+                    readonly tableName: 'Assignment';
+                    readonly columns: readonly ['id'];
+                  };
+                },
                 {
                   readonly source: {
                     readonly namespaceId: 'public' & NamespaceId;
@@ -683,6 +796,10 @@ type ContractBase = Omit<
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: {
+    readonly Assignment: {
+      readonly namespace: 'public' & NamespaceId;
+      readonly model: 'Assignment';
+    };
     readonly Class: { readonly namespace: 'public' & NamespaceId; readonly model: 'Class' };
     readonly Enrollment: {
       readonly namespace: 'public' & NamespaceId;
@@ -698,6 +815,75 @@ type ContractBase = Omit<
     readonly namespaces: {
       readonly public: {
         readonly models: {
+          readonly Assignment: {
+            readonly fields: {
+              readonly classId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly instructions: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly open: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly class: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Class';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['classId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly submissions: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Submission';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['assignmentId'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'Assignment';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly classId: { readonly column: 'classId' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly id: { readonly column: 'id' };
+                readonly instructions: { readonly column: 'instructions' };
+                readonly open: { readonly column: 'open' };
+                readonly title: { readonly column: 'title' };
+              };
+            };
+          };
           readonly Class: {
             readonly fields: {
               readonly createdAt: {
@@ -734,6 +920,17 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly assignments: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Assignment';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['classId'];
+                };
+              };
               readonly enrollments: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -838,6 +1035,10 @@ type ContractBase = Omit<
           };
           readonly Submission: {
             readonly fields: {
+              readonly assignmentId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly assignmentText: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -900,6 +1101,18 @@ type ContractBase = Omit<
               };
             };
             readonly relations: {
+              readonly assignment: {
+                readonly to: {
+                  readonly namespace: 'public' & NamespaceId;
+                  readonly model: 'Assignment';
+                };
+                readonly cardinality: 'N:1';
+                readonly nullable: false;
+                readonly on: {
+                  readonly localFields: readonly ['assignmentId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
               readonly class: {
                 readonly to: {
                   readonly namespace: 'public' & NamespaceId;
@@ -917,6 +1130,7 @@ type ContractBase = Omit<
               readonly table: 'Submission';
               readonly namespaceId: 'public';
               readonly fields: {
+                readonly assignmentId: { readonly column: 'assignmentId' };
                 readonly assignmentText: { readonly column: 'assignmentText' };
                 readonly classId: { readonly column: 'classId' };
                 readonly createdAt: { readonly column: 'createdAt' };
@@ -1015,6 +1229,18 @@ type ContractBase = Omit<
     readonly executionHash: ExecutionHash;
     readonly mutations: {
       readonly defaults: readonly [
+        {
+          readonly onCreate: {
+            readonly id: 'timestampNow';
+            readonly kind: 'generator';
+            readonly params: { readonly precision: 3 };
+          };
+          readonly ref: {
+            readonly entry: 'Assignment';
+            readonly field: 'createdAt';
+            readonly namespace: 'public';
+          };
+        },
         {
           readonly onCreate: {
             readonly id: 'timestampNow';

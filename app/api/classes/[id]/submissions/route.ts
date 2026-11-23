@@ -24,6 +24,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
     .where({ classId: id })
     .select(
       "id",
+      "assignmentId",
       "studentName",
       "studentEmail",
       "quiz",
@@ -37,8 +38,20 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
     .orderBy((s) => s.createdAt.desc())
     .all();
 
+  // Prototype scale — a per-submission lookup is fine; avoids needing a
+  // relation include for just the assignment title.
+  const assignmentTitles = new Map<number, string>();
+  for (const s of submissions) {
+    if (assignmentTitles.has(s.assignmentId)) continue;
+    const assignment = await db.orm.public.Assignment
+      .where({ id: s.assignmentId })
+      .select("title")
+      .first();
+    assignmentTitles.set(s.assignmentId, assignment?.title ?? "Untitled assignment");
+  }
+
   return NextResponse.json({
     class: { id: cls.id, name: cls.name, joinCode: cls.joinCode },
-    submissions,
+    submissions: submissions.map((s) => ({ ...s, assignmentTitle: assignmentTitles.get(s.assignmentId) })),
   });
 }

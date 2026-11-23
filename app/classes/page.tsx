@@ -27,7 +27,6 @@ export default function ClassesPage() {
   const router = useRouter();
   const [classes, setClasses] = useState<ClassRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
   const [editingCodeId, setEditingCodeId] = useState<number | null>(null);
   const [codeDraft, setCodeDraft] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -49,25 +48,6 @@ export default function ClassesPage() {
       return;
     }
     setClasses(data.classes);
-  }
-
-  async function toggleQuiz(cls: ClassRow) {
-    setTogglingId(cls.id);
-    try {
-      const res = await fetch(`/api/classes/${cls.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quizOpen: !cls.quizOpen }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClasses((prev) =>
-          prev ? prev.map((c) => (c.id === cls.id ? { ...c, quizOpen: data.class.quizOpen } : c)) : prev
-        );
-      }
-    } finally {
-      setTogglingId(null);
-    }
   }
 
   function startEditCode(cls: ClassRow) {
@@ -301,6 +281,21 @@ export default function ClassesPage() {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Link
+                  href={`/classes/${cls.id}/assignments`}
+                  style={{
+                    background: "#fff",
+                    color: colors.ink,
+                    border: `1px solid ${colors.cardBorder}`,
+                    borderRadius: 8,
+                    padding: "7px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                  }}
+                >
+                  Assignments
+                </Link>
+                <Link
                   href={`/classes/${cls.id}/submissions`}
                   style={{
                     background: "#fff",
@@ -315,34 +310,6 @@ export default function ClassesPage() {
                 >
                   Review submissions
                 </Link>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    background: cls.quizOpen ? "#E7F1EB" : "#EFEDE6",
-                    color: cls.quizOpen ? colors.green : colors.muted,
-                  }}
-                >
-                  {cls.quizOpen ? "Quiz open" : "Quiz closed"}
-                </span>
-                <button
-                  onClick={() => toggleQuiz(cls)}
-                  disabled={togglingId === cls.id}
-                  style={{
-                    background: "#fff",
-                    border: `1px solid ${colors.cardBorder}`,
-                    borderRadius: 8,
-                    padding: "7px 14px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: togglingId === cls.id ? "default" : "pointer",
-                    opacity: togglingId === cls.id ? 0.6 : 1,
-                  }}
-                >
-                  {cls.quizOpen ? "Close quiz" : "Open quiz"}
-                </button>
               </div>
             </div>
           ))}

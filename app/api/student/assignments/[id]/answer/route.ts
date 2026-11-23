@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 
-export async function POST(request: Request, ctx: RouteContext<"/api/student/classes/[id]/answer">) {
+export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/answer">) {
   const session = await getCurrentStudentSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
@@ -11,14 +11,14 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/cla
   const { id: idParam } = await ctx.params;
   const id = Number(idParam);
   if (!Number.isInteger(id)) {
-    return NextResponse.json({ error: "Invalid class id." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid assignment id." }, { status: 400 });
   }
 
   const submission = await db.orm.public.Submission
-    .where({ classId: id, studentEmail: session.email })
+    .where({ assignmentId: id, studentEmail: session.email })
     .first();
   if (!submission) {
-    return NextResponse.json({ error: "No submission found for this class." }, { status: 404 });
+    return NextResponse.json({ error: "No submission found for this assignment." }, { status: 404 });
   }
 
   let body: unknown;

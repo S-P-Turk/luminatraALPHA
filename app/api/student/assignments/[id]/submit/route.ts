@@ -3,7 +3,7 @@ import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { generateQuiz } from "@/src/lib/quiz";
 
-export async function POST(request: Request, ctx: RouteContext<"/api/student/classes/[id]/submit">) {
+export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/submit">) {
   const session = await getCurrentStudentSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
@@ -12,32 +12,37 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/cla
   const { id: idParam } = await ctx.params;
   const id = Number(idParam);
   if (!Number.isInteger(id)) {
-    return NextResponse.json({ error: "Invalid class id." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid assignment id." }, { status: 400 });
+  }
+
+  const assignment = await db.orm.public.Assignment.where({ id }).first();
+  if (!assignment) {
+    return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
   }
 
   const enrollment = await db.orm.public.Enrollment
-    .where({ classId: id, studentEmail: session.email })
+    .where({ classId: assignment.classId, studentEmail: session.email })
     .first();
   if (!enrollment) {
     return NextResponse.json({ error: "You haven't joined this class." }, { status: 403 });
   }
-
-  const cls = await db.orm.public.Class.where({ id }).first();
-  if (!cls) {
-    return NextResponse.json({ error: "Class not found." }, { status: 404 });
-  }
-  if (!cls.quizOpen) {
-    return NextResponse.json({ error: "Your teacher hasn't opened submissions for this class yet." }, { status: 400 });
+  if (!assignment.open) {
+    return NextResponse.json({ error: "This assignment isn't open for submissions yet." }, { status: 400 });
   }
 
   const existing = await db.orm.public.Submission
-    .where({ classId: id, studentEmail: session.email })
+    .where({ assignmentId: id, studentEmail: session.email })
     .first();
   if (existing) {
     return NextResponse.json(
-      { error: "You've already submitted for this class.", submission: existing },
+      { error: "You've already submitted this assignment.", submission: existing },
       { status: 409 }
     );
+  }
+
+  const cls = await db.orm.public.Class.where({ id: assignment.classId }).first();
+  if (!cls) {
+    return NextResponse.json({ error: "Class not found." }, { status: 404 });
   }
 
   let body: unknown;
@@ -64,21 +69,24 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/cla
     return NextResponse.json({ error: "That's too long — trim it down and try again." }, { status: 400 });
   }
 
+  // The class syllabus is the source of AI-use rules; the assignment's own
+  // instructions tell the model what this particular piece of work actually
+  // asked for, so the comprehension quiz can target the right claims.
+  const combinedPolicy = `COURSE SYLLABUS / AI-USE POLICY:\n${cls.syllabusText}\n\n---\n\nTHIS ASSIGNMENT'S INSTRUCTIONS:\n${assignment.title}\n${assignment.instructions}`;
+
   let quiz;
   try {
-    quiz = await generateQuiz(transcript, cls.syllabusText);
+    quiz = await generateQuiz(transcript, combinedPolicy);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not generate your quiz.";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
-  // A flagged policy mismatch goes to the student first, not straight to
-  // the teacher — they get a chance to add context before it lands on the
-  // teacher's review queue.
   const status = quiz.policy_concern ? "flagged" : "submitted";
 
   const created = await db.orm.public.Submission.create({
-    classId: id,
+    assignmentId: id,
+    classId: assignment.classId,
     studentName: session.name,
     studentEmail: session.email,
     assignmentText,

@@ -21,17 +21,38 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/cla
     return NextResponse.json({ error: "You haven't joined this class." }, { status: 403 });
   }
 
-  const cls = await db.orm.public.Class
-    .where({ id })
-    .select("id", "name", "quizOpen")
-    .first();
+  const cls = await db.orm.public.Class.where({ id }).select("id", "name").first();
   if (!cls) {
     return NextResponse.json({ error: "Class not found." }, { status: 404 });
   }
 
-  const submission = await db.orm.public.Submission
-    .where({ classId: id, studentEmail: session.email })
-    .first();
+  const assignments = await db.orm.public.Assignment
+    .where({ classId: id })
+    .orderBy((a) => a.createdAt.desc())
+    .all();
 
-  return NextResponse.json({ student: session, class: cls, submission: submission ?? null });
+  const result = [];
+  for (const a of assignments) {
+    const submission = await db.orm.public.Submission
+      .where({ assignmentId: a.id, studentEmail: session.email })
+      .select("id", "status", "quiz", "quizAnswers", "studentResponse")
+      .first();
+
+    result.push({
+      id: a.id,
+      title: a.title,
+      open: a.open,
+      submission: submission
+        ? {
+            id: submission.id,
+            status: submission.status,
+            hasQuiz: submission.quiz != null,
+            hasAnswers: submission.quizAnswers != null,
+            hasResponded: submission.studentResponse != null,
+          }
+        : null,
+    });
+  }
+
+  return NextResponse.json({ class: cls, assignments: result });
 }

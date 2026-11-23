@@ -14,6 +14,8 @@ type Quiz = {
 
 type Submission = {
   id: number;
+  assignmentId: number;
+  assignmentTitle: string;
   studentName: string;
   studentEmail: string;
   quiz: Quiz | null;
@@ -219,6 +221,7 @@ function SubmissionRow({ s }: { s: Submission }) {
         <div>
           <div style={{ fontSize: 15, fontWeight: 600, color: colors.ink }}>{s.studentName}</div>
           <div style={{ fontSize: 12, color: colors.muted }}>{s.studentEmail}</div>
+          <div style={{ fontSize: 12, color: colors.accent, fontWeight: 600, marginTop: 2 }}>{s.assignmentTitle}</div>
           <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
             {new Date(s.createdAt).toLocaleString()}
           </div>
