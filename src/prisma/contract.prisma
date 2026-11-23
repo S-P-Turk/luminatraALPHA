@@ -20,7 +20,23 @@ model Class {
   teacher        Teacher      @relation(fields: [teacherId], references: [id])
   teacherId      Int
   submissions    Submission[]
+  enrollments    Enrollment[]
   createdAt      DateTime     @default(now()) @onCreate(now())
+}
+
+// A student's membership in a class. Students have no password-based
+// account — their identity is just the name/email in their session cookie
+// (see src/lib/student-auth.ts) — so this table is what lets one student
+// belong to several classes instead of a single class living in the cookie.
+model Enrollment {
+  id           Int      @id @default(autoincrement())
+  class        Class    @relation(fields: [classId], references: [id])
+  classId      Int
+  studentName  String
+  studentEmail String
+  createdAt    DateTime @default(now()) @onCreate(now())
+
+  @@unique([classId, studentEmail])
 }
 
 model Submission {

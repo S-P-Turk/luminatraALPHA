@@ -8,6 +8,10 @@
       "model": "Class",
       "namespace": "public"
     },
+    "Enrollment": {
+      "model": "Enrollment",
+      "namespace": "public"
+    },
     "Submission": {
       "model": "Submission",
       "namespace": "public"
@@ -77,6 +81,21 @@
               }
             },
             "relations": {
+              "enrollments": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "classId"
+                  ]
+                },
+                "to": {
+                  "model": "Enrollment",
+                  "namespace": "public"
+                }
+              },
               "submissions": {
                 "cardinality": "1:N",
                 "on": {
@@ -135,6 +154,87 @@
               },
               "namespaceId": "public",
               "table": "Class"
+            }
+          },
+          "Enrollment": {
+            "fields": {
+              "classId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "studentEmail": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "studentName": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "class": {
+                "cardinality": "N:1",
+                "nullable": false,
+                "on": {
+                  "localFields": [
+                    "classId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Class",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "classId": {
+                  "column": "classId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "studentEmail": {
+                  "column": "studentEmail"
+                },
+                "studentName": {
+                  "column": "studentName"
+                }
+              },
+              "namespaceId": "public",
+              "table": "Enrollment"
             }
           },
           "Submission": {
@@ -467,6 +567,90 @@
                 }
               ]
             },
+            "Enrollment": {
+              "columns": {
+                "classId": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nullable": false
+                },
+                "studentEmail": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "studentName": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "index": {
+                    "name": "Enrollment_classId_idx_0089e5e7"
+                  },
+                  "source": {
+                    "columns": [
+                      "classId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Enrollment"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "Class"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "classId"
+                  ],
+                  "name": "Enrollment_classId_idx_0089e5e7",
+                  "prefix": "Enrollment_classId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "classId",
+                    "studentEmail"
+                  ]
+                }
+              ]
+            },
             "Submission": {
               "columns": {
                 "assignmentText": {
@@ -641,10 +825,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "138f2801724c8c891bf4589b0d278c49d2040f2308bf6c92d87b682eaf68b235"
+    "storageHash": "6dd458f807d89a091df327f2a4c8c42c6df402ae34f663fca8c51d719624f1f9"
   },
   "execution": {
-    "executionHash": "4afb389f112e73177cf8e04c68f37c675a2d0006441a993fedc6c5a7e85cb9cc",
+    "executionHash": "a550fa130c2525562dafd2af89dce57ab7a4e96cebb4d064027a9e6fb798fba9",
     "mutations": {
       "defaults": [
         {
@@ -657,6 +841,20 @@
           },
           "ref": {
             "entry": "Class",
+            "field": "createdAt",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator",
+            "params": {
+              "precision": 3
+            }
+          },
+          "ref": {
+            "entry": "Enrollment",
             "field": "createdAt",
             "namespace": "public"
           }

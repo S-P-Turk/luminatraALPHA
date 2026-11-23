@@ -15,7 +15,6 @@ const colors = {
 
 export default function StudentLoginPage() {
   const router = useRouter();
-  const [joinCode, setJoinCode] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +28,7 @@ export default function StudentLoginPage() {
       const res = await fetch("/api/auth/student-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ joinCode, name, email }),
+        body: JSON.stringify({ name, email }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -78,28 +77,10 @@ export default function StudentLoginPage() {
         >
           Luminatra
         </div>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Join your class</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Sign in as a student</h1>
         <p style={{ margin: 0, fontSize: 14, color: colors.muted }}>
-          Your teacher shared a class code — enter it below.
+          Once you&apos;re signed in you can join any number of classes with a code.
         </p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Class code</label>
-          <input
-            required
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-            placeholder="ABC123"
-            style={{
-              border: `1px solid ${colors.cardBorder}`,
-              borderRadius: 8,
-              padding: "10px 12px",
-              fontSize: 16,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          />
-        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ fontSize: 13, fontWeight: 600 }}>Your name</label>
@@ -151,7 +132,7 @@ export default function StudentLoginPage() {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? "Joining..." : "Join class"}
+          {loading ? "Signing in..." : "Continue"}
         </button>
 
         <Link href="/" style={{ fontSize: 13, color: colors.accent, textDecoration: "none", textAlign: "center" }}>

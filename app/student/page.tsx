@@ -2,10 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-type StudentMe = {
-  student: { name: string; email: string; classId: number };
-  class: { id: number; name: string; quizOpen: boolean };
+type ClassSummary = {
+  id: number;
+  name: string;
+  quizOpen: boolean;
+  submission: {
+    id: number;
+    status: string;
+    hasQuiz: boolean;
+    hasAnswers: boolean;
+    hasResponded: boolean;
+  } | null;
 };
 
 const colors = {
@@ -16,12 +25,36 @@ const colors = {
   border: "#E7E2D8",
   cardBorder: "#D8D3C6",
   green: "#3F7A5E",
+  amber: "#B8822F",
+  amberBg: "#FBF0DA",
 };
+
+function statusLabel(cls: ClassSummary): { text: string; bg: string; fg: string } {
+  if (!cls.submission) {
+    return cls.quizOpen
+      ? { text: "Open — not submitted", bg: colors.amberBg, fg: colors.amber }
+      : { text: "Waiting to open", bg: "#EFEDE6", fg: colors.muted };
+  }
+  if (cls.submission.status === "flagged" && !cls.submission.hasResponded) {
+    return { text: "Needs your response", bg: colors.amberBg, fg: colors.amber };
+  }
+  if (cls.submission.status === "flagged") {
+    return { text: "Flagged — awaiting teacher", bg: colors.amberBg, fg: colors.amber };
+  }
+  if (!cls.submission.hasAnswers) {
+    return { text: "Quiz ready — answer it", bg: colors.amberBg, fg: colors.amber };
+  }
+  return { text: "Submitted", bg: "#E7F1EB", fg: colors.green };
+}
 
 export default function StudentHomePage() {
   const router = useRouter();
-  const [data, setData] = useState<StudentMe | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [classes, setClasses] = useState<ClassSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -33,12 +66,35 @@ export default function StudentHomePage() {
       router.push("/student/login");
       return;
     }
-    const json = await res.json();
+    const data = await res.json();
     if (!res.ok) {
-      setError(json.error ?? "Something went wrong.");
+      setError(data.error ?? "Something went wrong.");
       return;
     }
-    setData(json);
+    setName(data.student.name);
+    setClasses(data.classes);
+  }
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault();
+    setJoinError(null);
+    setJoining(true);
+    try {
+      const res = await fetch("/api/student/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ joinCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setJoinError(data.error ?? "Could not join that class.");
+        return;
+      }
+      setJoinCode("");
+      await load();
+    } finally {
+      setJoining(false);
+    }
   }
 
   async function handleLeave() {
@@ -50,94 +106,154 @@ export default function StudentHomePage() {
     <main
       style={{
         minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         background: colors.bg,
         fontFamily: "Inter, system-ui, sans-serif",
         color: colors.ink,
-        padding: 24,
+        padding: "48px 32px 80px",
       }}
     >
-      <div
-        style={{
-          background: "#fff",
-          border: `1px solid ${colors.border}`,
-          borderRadius: 12,
-          padding: "36px 32px",
-          width: 420,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: colors.accent,
-          }}
-        >
-          Luminatra
-        </div>
-
-        {error && <div style={{ fontSize: 14, color: "#B8822F" }}>{error}</div>}
-
-        {data && (
-          <>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>{data.class.name}</h1>
-            <p style={{ margin: 0, fontSize: 14, color: colors.muted }}>
-              Signed in as {data.student.name}
-            </p>
-
-            {data.class.quizOpen ? (
-              <div
-                style={{
-                  background: "#E7F1EB",
-                  color: colors.green,
-                  borderRadius: 8,
-                  padding: "14px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
-              >
-                Quiz is open — submission flow coming soon.
-              </div>
-            ) : (
-              <div
-                style={{
-                  background: "#EFEDE6",
-                  color: colors.muted,
-                  borderRadius: 8,
-                  padding: "14px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
-              >
-                Waiting for your teacher to open the quiz in class.
-              </div>
-            )}
-
-            <button
-              onClick={handleLeave}
+      <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div
               style={{
-                background: "#fff",
-                border: `1px solid ${colors.cardBorder}`,
-                borderRadius: 8,
-                padding: "9px 16px",
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: "pointer",
-                alignSelf: "center",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: colors.accent,
               }}
             >
-              Not you? Switch student
-            </button>
-          </>
+              Luminatra
+            </div>
+            <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Your classes</h1>
+            {name && <p style={{ margin: "2px 0 0", fontSize: 13, color: colors.muted }}>Signed in as {name}</p>}
+          </div>
+          <button
+            onClick={handleLeave}
+            style={{
+              background: "#fff",
+              border: `1px solid ${colors.cardBorder}`,
+              borderRadius: 8,
+              padding: "9px 16px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Not you? Switch student
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleJoin}
+          style={{
+            background: "#fff",
+            border: `1px solid ${colors.border}`,
+            borderRadius: 10,
+            padding: "16px 20px",
+            display: "flex",
+            alignItems: "flex-end",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 160 }}>
+            <label style={{ fontSize: 13, fontWeight: 600 }}>Join another class</label>
+            <input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="Class code, e.g. ABC123"
+              style={{
+                border: `1px solid ${colors.cardBorder}`,
+                borderRadius: 8,
+                padding: "9px 12px",
+                fontSize: 14,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={joining || !joinCode}
+            style={{
+              background: colors.ink,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: joining || !joinCode ? "default" : "pointer",
+              opacity: joining || !joinCode ? 0.6 : 1,
+            }}
+          >
+            {joining ? "Joining..." : "Join"}
+          </button>
+          {joinError && <div style={{ width: "100%", fontSize: 13, color: colors.amber }}>{joinError}</div>}
+        </form>
+
+        {error && <div style={{ color: colors.amber, fontSize: 14 }}>{error}</div>}
+
+        {classes === null && !error && (
+          <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>
         )}
+
+        {classes?.length === 0 && (
+          <div
+            style={{
+              background: "#fff",
+              border: `1px solid ${colors.border}`,
+              borderRadius: 10,
+              padding: 32,
+              textAlign: "center",
+              color: colors.muted,
+              fontSize: 14,
+            }}
+          >
+            You haven&apos;t joined a class yet. Enter the code your teacher gave you above.
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {classes?.map((cls) => {
+            const label = statusLabel(cls);
+            return (
+              <Link
+                key={cls.id}
+                href={`/student/classes/${cls.id}`}
+                style={{
+                  background: "#fff",
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 10,
+                  padding: "16px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  textDecoration: "none",
+                  color: colors.ink,
+                }}
+              >
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{cls.name}</div>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    background: label.bg,
+                    color: label.fg,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label.text}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </main>
   );

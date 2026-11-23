@@ -4,12 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
+type QuizQuestion = { question: string; what_it_tests: string };
+type Quiz = {
+  policy_summary: string;
+  policy_concern: string | null;
+  claimed_unassisted_areas: string[];
+  quiz: QuizQuestion[];
+};
+
 type Submission = {
   id: number;
   studentName: string;
   studentEmail: string;
-  quiz: unknown;
-  quizAnswers: unknown;
+  quiz: Quiz | null;
+  quizAnswers: string[] | null;
   reportCard: unknown;
   studentResponse: string | null;
   status: string;
@@ -181,6 +189,8 @@ export default function SubmissionsClient() {
 
 function SubmissionRow({ s }: { s: Submission }) {
   const badge = statusBadge(s.status);
+  const [open, setOpen] = useState(false);
+
   return (
     <div
       style={{
@@ -188,32 +198,92 @@ function SubmissionRow({ s }: { s: Submission }) {
         border: `1px solid ${colors.border}`,
         borderRadius: 10,
         padding: "14px 18px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 16,
-        flexWrap: "wrap",
       }}
     >
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{s.studentName}</div>
-        <div style={{ fontSize: 12, color: colors.muted }}>{s.studentEmail}</div>
-        <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
-          {new Date(s.createdAt).toLocaleString()}
-        </div>
-      </div>
-      <span
+      <button
+        onClick={() => setOpen((v) => !v)}
         style={{
-          fontSize: 12,
-          fontWeight: 600,
-          padding: "4px 10px",
-          borderRadius: 999,
-          background: badge.bg,
-          color: badge.fg,
+          background: "none",
+          border: "none",
+          padding: 0,
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+          cursor: "pointer",
+          textAlign: "left",
         }}
       >
-        {badge.label}
-      </span>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: colors.ink }}>{s.studentName}</div>
+          <div style={{ fontSize: 12, color: colors.muted }}>{s.studentEmail}</div>
+          <div style={{ fontSize: 11, color: colors.muted, marginTop: 2 }}>
+            {new Date(s.createdAt).toLocaleString()}
+          </div>
+        </div>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            padding: "4px 10px",
+            borderRadius: 999,
+            background: badge.bg,
+            color: badge.fg,
+          }}
+        >
+          {badge.label}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            marginTop: 14,
+            paddingTop: 14,
+            borderTop: `1px solid ${colors.border}`,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            fontSize: 13,
+          }}
+        >
+          {s.quiz?.policy_concern && (
+            <div>
+              <div style={{ fontWeight: 700, color: colors.amber, marginBottom: 2 }}>Policy concern</div>
+              <div style={{ color: colors.ink }}>{s.quiz.policy_concern}</div>
+            </div>
+          )}
+          {s.quiz?.policy_summary && (
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>Policy summary</div>
+              <div style={{ color: colors.muted }}>{s.quiz.policy_summary}</div>
+            </div>
+          )}
+          {s.studentResponse && (
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>Student&apos;s response</div>
+              <div style={{ color: colors.ink }}>{s.studentResponse}</div>
+            </div>
+          )}
+          {s.quiz?.quiz && s.quiz.quiz.length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Comprehension check</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {s.quiz.quiz.map((q, i) => (
+                  <div key={i}>
+                    <div style={{ fontWeight: 600 }}>{q.question}</div>
+                    <div style={{ color: colors.muted, marginTop: 2 }}>
+                      {s.quizAnswers?.[i] ? s.quizAnswers[i] : <em>Not answered yet.</em>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

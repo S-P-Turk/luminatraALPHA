@@ -8,14 +8,37 @@ export async function GET() {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const cls = await db.orm.public.Class
-    .where({ id: session.classId })
-    .select("id", "name", "quizOpen")
-    .first();
+  const enrollments = await db.orm.public.Enrollment
+    .where({ studentEmail: session.email })
+    .orderBy((e) => e.createdAt.desc())
+    .all();
 
-  if (!cls) {
-    return NextResponse.json({ error: "Class not found." }, { status: 404 });
+  const classes = [];
+  for (const enrollment of enrollments) {
+    const cls = await db.orm.public.Class
+      .where({ id: enrollment.classId })
+      .select("id", "name", "quizOpen")
+      .first();
+    if (!cls) continue;
+
+    const submission = await db.orm.public.Submission
+      .where({ classId: cls.id, studentEmail: session.email })
+      .select("id", "status", "quiz", "quizAnswers", "studentResponse")
+      .first();
+
+    classes.push({
+      ...cls,
+      submission: submission
+        ? {
+            id: submission.id,
+            status: submission.status,
+            hasQuiz: submission.quiz != null,
+            hasAnswers: submission.quizAnswers != null,
+            hasResponded: submission.studentResponse != null,
+          }
+        : null,
+    });
   }
 
-  return NextResponse.json({ student: session, class: cls });
+  return NextResponse.json({ student: session, classes });
 }
