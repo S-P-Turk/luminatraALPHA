@@ -93,7 +93,7 @@ export default function StudentHomePage() {
 
   async function handleLeave() {
     await fetch("/api/auth/student-logout", { method: "POST" });
-    router.push("/student/login");
+    router.push("/");
   }
 
   return (
