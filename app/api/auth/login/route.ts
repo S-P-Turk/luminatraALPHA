@@ -22,12 +22,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
 
-  const teacher = await db.orm.public.Teacher
-    .where({ email })
-    .upsert({
-      create: { email },
-      update: {},
-    });
+  // Find-or-create by hand rather than relying on .upsert(): chaining
+  // .where({ email }).upsert(...) was issuing a plain insert regardless of
+  // whether the row existed, which threw a unique-constraint violation on
+  // every repeat login. This is a touch more verbose but unambiguous.
+  let teacher = await db.orm.public.Teacher.where({ email }).first();
+  if (!teacher) {
+    try {
+      teacher = await db.orm.public.Teacher.create({ email });
+    } catch {
+      // Lost a race with a concurrent request creating the same row.
+      teacher = await db.orm.public.Teacher.where({ email }).first();
+      if (!teacher) {
+        return NextResponse.json({ error: "Could not sign in. Try again." }, { status: 500 });
+      }
+    }
+  }
 
   const store = await cookies();
   store.set(TEACHER_COOKIE, teacher.email, {
