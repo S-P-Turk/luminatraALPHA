@@ -12,15 +12,37 @@ Produce 3 to 6 suggested assignments. For each one:
 
 If the syllabus doesn't clearly describe any gradable assignments, suggest a small number of reasonable generic ones that fit the course's general subject and note that they're generic in the instructions.
 
-Respond with ONLY valid JSON in this exact shape, no other text:
-
-{
-  "suggestions": [
-    { "title": "...", "instructions": "..." }
-  ]
-}`;
+Report your suggestions using the suggest_assignments tool. Don't write any other text.`;
 
 export type AssignmentSuggestion = { title: string; instructions: string };
+
+// Forced tool call rather than prompted "respond with JSON" text, so the API
+// guarantees schema-valid output instead of relying on JSON.parse against
+// freeform model text (which can break on an unescaped quote in the title
+// or instructions).
+const SUGGEST_TOOL: Anthropic.Tool = {
+  name: "suggest_assignments",
+  description: "Report the suggested assignments pulled from the syllabus.",
+  input_schema: {
+    type: "object",
+    properties: {
+      suggestions: {
+        type: "array",
+        minItems: 1,
+        maxItems: 6,
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            instructions: { type: "string" },
+          },
+          required: ["title", "instructions"],
+        },
+      },
+    },
+    required: ["suggestions"],
+  },
+};
 
 export async function generateAssignmentSuggestions(syllabusText: string): Promise<AssignmentSuggestion[]> {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -31,19 +53,16 @@ export async function generateAssignmentSuggestions(syllabusText: string): Promi
     model: "claude-sonnet-5",
     max_tokens: 1536,
     system: SYSTEM_PROMPT,
+    tools: [SUGGEST_TOOL],
+    tool_choice: { type: "tool", name: "suggest_assignments" },
     messages: [{ role: "user", content: `SYLLABUS:\n${syllabusText}` }],
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  const raw = textBlock && "text" in textBlock ? textBlock.text : "";
-
-  let parsed: { suggestions: AssignmentSuggestion[] };
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    const stripped = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-    parsed = JSON.parse(stripped);
+  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "suggest_assignments");
+  if (!toolUse || toolUse.type !== "tool_use") {
+    throw new Error("Couldn't generate suggestions. Try again.");
   }
 
-  return Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+  const input = toolUse.input as { suggestions?: AssignmentSuggestion[] };
+  return Array.isArray(input.suggestions) ? input.suggestions : [];
 }

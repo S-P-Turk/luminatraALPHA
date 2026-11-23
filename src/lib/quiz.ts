@@ -19,25 +19,57 @@ Your job, in order:
    - Question 1 must be answerable correctly in one sentence.
    - Question 2 must be answerable correctly in two sentences.
 
-4. Note any apparent mismatch between the syllabus rules and what the transcript shows the student doing (for example, the syllabus bans AI drafting but the transcript shows the AI writing full paragraphs).
+4. Note any apparent mismatch between the syllabus rules and what the transcript shows the student doing (for example, the syllabus bans AI drafting but the transcript shows the AI writing full paragraphs). If there's no mismatch, report policy_concern as an empty string.
 
-Respond with ONLY valid JSON in this exact shape, no other text:
-
-{
-  "policy_summary": "plain-language summary of what the syllabus allows/requires for AI use",
-  "policy_concern": "null, or a short note on any mismatch between stated policy and what the transcript shows",
-  "claimed_unassisted_areas": ["short list of what the student claims they did without AI help"],
-  "quiz": [
-    { "question": "...", "expected_length": "one_sentence", "what_it_tests": "short note on the specific gap this targets" },
-    { "question": "...", "expected_length": "two_sentences", "what_it_tests": "short note on the specific gap this targets" }
-  ]
-}`;
+Report your findings using the submit_quiz tool. Don't write any other text.`;
 
 export type QuizResult = {
   policy_summary: string;
   policy_concern: string | null;
   claimed_unassisted_areas: string[];
   quiz: { question: string; expected_length: "one_sentence" | "two_sentences"; what_it_tests: string }[];
+};
+
+// Structured as a forced tool call rather than "respond with JSON" prompted
+// text — the API enforces schema-valid output this way. The earlier
+// prompted-JSON version would occasionally break JSON.parse when the model's
+// own text contained an unescaped quote or got cut off mid-string.
+const QUIZ_TOOL: Anthropic.Tool = {
+  name: "submit_quiz",
+  description: "Report the policy analysis and comprehension quiz for this submission.",
+  input_schema: {
+    type: "object",
+    properties: {
+      policy_summary: {
+        type: "string",
+        description: "Plain-language summary of what the syllabus allows/requires for AI use.",
+      },
+      policy_concern: {
+        type: "string",
+        description: "A short note on any mismatch between stated policy and what the transcript shows. Empty string if there's no concern.",
+      },
+      claimed_unassisted_areas: {
+        type: "array",
+        items: { type: "string" },
+        description: "Short list of what the student claims they did without AI help.",
+      },
+      quiz: {
+        type: "array",
+        minItems: 2,
+        maxItems: 2,
+        items: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            expected_length: { type: "string", enum: ["one_sentence", "two_sentences"] },
+            what_it_tests: { type: "string", description: "Short note on the specific gap this question targets." },
+          },
+          required: ["question", "expected_length", "what_it_tests"],
+        },
+      },
+    },
+    required: ["policy_summary", "policy_concern", "claimed_unassisted_areas", "quiz"],
+  },
 };
 
 export async function generateQuiz(transcript: string, syllabus: string): Promise<QuizResult> {
@@ -49,18 +81,17 @@ export async function generateQuiz(transcript: string, syllabus: string): Promis
     model: "claude-sonnet-5",
     max_tokens: 2048,
     system: SYSTEM_PROMPT,
+    tools: [QUIZ_TOOL],
+    tool_choice: { type: "tool", name: "submit_quiz" },
     messages: [
       { role: "user", content: `SYLLABUS:\n${syllabus}\n\n---\n\nAI TRANSCRIPT:\n${transcript}` },
     ],
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  const raw = textBlock && "text" in textBlock ? textBlock.text : "";
-
-  try {
-    return JSON.parse(raw) as QuizResult;
-  } catch {
-    const stripped = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-    return JSON.parse(stripped) as QuizResult;
+  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_quiz");
+  if (!toolUse || toolUse.type !== "tool_use") {
+    throw new Error("The quiz generator didn't return a structured result. Try again.");
   }
+
+  return toolUse.input as QuizResult;
 }
