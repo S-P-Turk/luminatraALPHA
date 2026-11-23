@@ -36,13 +36,16 @@ export async function PATCH(
   }
 
   const openRaw = (body as { open?: unknown })?.open;
-  if (typeof openRaw !== "boolean") {
-    return NextResponse.json({ error: "open must be a boolean." }, { status: 400 });
+  const quizOpenRaw = (body as { quizOpen?: unknown })?.quizOpen;
+  if (typeof openRaw !== "boolean" && typeof quizOpenRaw !== "boolean") {
+    return NextResponse.json({ error: "Send open and/or quizOpen as a boolean." }, { status: 400 });
   }
 
-  const updated = await db.orm.public.Assignment
-    .where({ id: assignmentId })
-    .update({ open: openRaw });
+  const patch: { open?: boolean; quizOpen?: boolean } = {};
+  if (typeof openRaw === "boolean") patch.open = openRaw;
+  if (typeof quizOpenRaw === "boolean") patch.quizOpen = quizOpenRaw;
+
+  const updated = await db.orm.public.Assignment.where({ id: assignmentId }).update(patch);
 
   return NextResponse.json({ assignment: updated });
 }

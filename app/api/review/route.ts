@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
+import { gradeIfNeeded } from "@/src/lib/grading";
 
 // Every submission across all of the signed-in teacher's classes, so the
 // teacher has one place to review instead of opening each class.
@@ -27,8 +28,11 @@ export async function GET() {
         "assignmentId",
         "studentName",
         "studentEmail",
+        "assignmentText",
+        "transcript",
         "quiz",
         "quizAnswers",
+        "reportCard",
         "studentResponse",
         "status",
         "createdAt"
@@ -39,7 +43,17 @@ export async function GET() {
         const a = await db.orm.public.Assignment.where({ id: s.assignmentId }).select("title").first();
         assignmentTitles.set(s.assignmentId, a?.title ?? "Untitled assignment");
       }
-      submissions.push({ ...s, className: cls.name, assignmentTitle: assignmentTitles.get(s.assignmentId) });
+      // Grades any answered-but-ungraded quiz (e.g. ones answered before
+      // grading existed) so failed comprehension shows up as a flag.
+      const graded = await gradeIfNeeded(s);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { assignmentText, transcript, ...rest } = s;
+      submissions.push({
+        ...rest,
+        ...graded,
+        className: cls.name,
+        assignmentTitle: assignmentTitles.get(s.assignmentId),
+      });
     }
   }
 

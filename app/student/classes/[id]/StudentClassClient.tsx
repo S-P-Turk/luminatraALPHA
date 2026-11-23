@@ -8,6 +8,7 @@ type AssignmentRow = {
   id: number;
   title: string;
   open: boolean;
+  quizOpen: boolean;
   submission: {
     id: number;
     status: string;
@@ -34,6 +35,11 @@ function statusLabel(a: AssignmentRow): { text: string; bg: string; fg: string }
     return a.open
       ? { text: "Open — not submitted", bg: colors.amberBg, fg: colors.amber }
       : { text: "Not open yet", bg: "#EFEDE6", fg: colors.muted };
+  }
+  if (a.submission.hasQuiz && !a.submission.hasAnswers) {
+    return a.quizOpen
+      ? { text: "Quiz ready — answer it", bg: colors.amberBg, fg: colors.amber }
+      : { text: "Submitted — quiz not started", bg: "#EFEDE6", fg: colors.muted };
   }
   if (a.submission.status === "flagged" && !a.submission.hasResponded) {
     return { text: "Needs your response", bg: colors.amberBg, fg: colors.amber };

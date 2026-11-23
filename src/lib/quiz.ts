@@ -97,3 +97,83 @@ export async function generateQuiz(transcript: string, syllabus: string): Promis
 
   return toolUse.input as QuizResult;
 }
+
+// ---------------------------------------------------------------------------
+// Grading the student's quiz answers. Failing the comprehension check is its
+// own offense, separate from an AI-use policy concern: it means the student
+// couldn't explain work they claimed to have done themselves.
+
+export type ComprehensionResult = {
+  passed: boolean;
+  note: string;
+  per_question: { adequate: boolean; reason: string }[];
+};
+
+const GRADE_SYSTEM_PROMPT = `You are part of an academic integrity tool. A student submitted an assignment and an AI-use transcript, then answered a short comprehension check about the parts of the work they claim they did WITHOUT AI help.
+
+Decide, for each answer, whether it shows the student genuinely understands that part of their own submission. An answer is adequate if it is specific and consistent with the submitted work — it doesn't need to be polished or perfectly worded. An answer is NOT adequate if it is wrong, contradicts the submission, is vague or generic enough that anyone could write it without having done the work, dodges the question, or is blank / "I don't know" / nonsense.
+
+The student fails the check if any answer is not adequate.
+
+Keep it short: each reason is a few words; note is one sentence (under 25 words) a teacher can read at a glance, stating what the student couldn't explain. If they passed, note is a short confirmation.
+
+Report using the submit_grade tool. Don't write any other text.`;
+
+const GRADE_TOOL: Anthropic.Tool = {
+  name: "submit_grade",
+  description: "Report whether the student's quiz answers show real comprehension.",
+  input_schema: {
+    type: "object",
+    properties: {
+      passed: { type: "boolean" },
+      note: { type: "string", description: "One sentence, under 25 words, for the teacher." },
+      per_question: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            adequate: { type: "boolean" },
+            reason: { type: "string", description: "A few words." },
+          },
+          required: ["adequate", "reason"],
+        },
+      },
+    },
+    required: ["passed", "note", "per_question"],
+  },
+};
+
+export async function gradeAnswers(input: {
+  assignmentText: string;
+  transcript: string;
+  quiz: QuizResult;
+  answers: string[];
+}): Promise<ComprehensionResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error("Server is missing ANTHROPIC_API_KEY.");
+  }
+
+  const qa = input.quiz.quiz
+    .map((q, i) => `Q${i + 1}: ${q.question}\n(tests: ${q.what_it_tests})\nA${i + 1}: ${input.answers[i] ?? ""}`)
+    .join("\n\n");
+
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-5",
+    max_tokens: 1024,
+    system: GRADE_SYSTEM_PROMPT,
+    tools: [GRADE_TOOL],
+    tool_choice: { type: "tool", name: "submit_grade" },
+    messages: [
+      {
+        role: "user",
+        content: `STUDENT'S SUBMITTED WORK:\n${input.assignmentText}\n\n---\n\nAI TRANSCRIPT:\n${input.transcript}\n\n---\n\nWHAT THE STUDENT CLAIMS THEY DID WITHOUT AI:\n${input.quiz.claimed_unassisted_areas.join("; ")}\n\n---\n\nCOMPREHENSION CHECK:\n${qa}`,
+      },
+    ],
+  });
+
+  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_grade");
+  if (!toolUse || toolUse.type !== "tool_use") {
+    throw new Error("The grader didn't return a structured result.");
+  }
+  return toolUse.input as ComprehensionResult;
+}

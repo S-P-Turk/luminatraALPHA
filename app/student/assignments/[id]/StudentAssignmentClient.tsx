@@ -21,12 +21,13 @@ type Submission = {
   quiz: Quiz | null;
   quizAnswers: string[] | null;
   studentResponse: string | null;
+  reportCard: { comprehension?: { passed: boolean; note: string } } | null;
   status: string;
 };
 
 type Detail = {
   class: { id: number; name: string };
-  assignment: { id: number; title: string; instructions: string; open: boolean };
+  assignment: { id: number; title: string; instructions: string; open: boolean; quizOpen: boolean };
   submission: Submission | null;
 };
 
@@ -89,7 +90,7 @@ export default function StudentAssignmentClient() {
       return;
     }
     setDetail(data);
-    if (data.submission?.quiz?.quiz) {
+    if (data.submission?.quiz?.quiz?.length) {
       setAnswers(data.submission.quizAnswers ?? data.submission.quiz.quiz.map(() => ""));
     }
   }
@@ -110,8 +111,8 @@ export default function StudentAssignmentClient() {
         if (data.submission) setDetail((d) => (d ? { ...d, submission: data.submission } : d));
         return;
       }
-      setDetail((d) => (d ? { ...d, submission: data.submission } : d));
-      setAnswers(data.submission.quiz?.quiz?.map(() => "") ?? []);
+      // Reload so the quiz stays hidden unless the teacher has activated it.
+      await load();
     } finally {
       setSubmitting(false);
     }
@@ -237,8 +238,8 @@ export default function StudentAssignmentClient() {
             }}
           >
             <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
-              Paste your submission and your AI conversation transcript (if you used one). A short comprehension
-              quiz will be generated from this.
+              Paste your submission and your AI conversation transcript (if you used one). Your teacher will
+              start a short comprehension quiz on it later.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 600 }}>Your assignment</label>
@@ -278,13 +279,30 @@ export default function StudentAssignmentClient() {
                 alignSelf: "flex-start",
               }}
             >
-              {submitting ? "Generating your quiz..." : "Submit"}
+              {submitting ? "Submitting..." : "Submit"}
             </button>
           </form>
         )}
 
-        {/* Quiz generated, not yet answered */}
-        {submission && submission.quiz && !submission.quizAnswers && (
+        {/* Submitted, quiz not activated by the teacher yet */}
+        {submission && submission.quiz && !submission.quizAnswers && !detail?.assignment.quizOpen && (
+          <div
+            style={{
+              background: "#EFEDE6",
+              color: colors.ink,
+              borderRadius: 10,
+              padding: "16px 18px",
+              fontSize: 14,
+            }}
+          >
+            <strong>Submitted.</strong> Your teacher will start the comprehension quiz — come back here when they
+            do.
+          </div>
+        )}
+
+        {/* Quiz active, not yet answered */}
+        {submission && submission.quiz && !submission.quizAnswers && detail?.assignment.quizOpen && (
+          (submission.quiz.quiz.length > 0 && (
           <form
             onSubmit={handleAnswers}
             style={{
@@ -345,6 +363,7 @@ export default function StudentAssignmentClient() {
               {savingAnswers ? "Saving..." : "Submit answers"}
             </button>
           </form>
+          ))
         )}
 
         {/* Answered, flagged, needs student response before teacher sees it */}
@@ -364,9 +383,16 @@ export default function StudentAssignmentClient() {
             <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: colors.amber }}>
               One thing worth clarifying
             </h2>
-            <p style={{ margin: 0, fontSize: 13, color: colors.ink }}>
-              {submission.quiz?.policy_concern}
-            </p>
+            {submission.quiz?.policy_concern && (
+              <p style={{ margin: 0, fontSize: 13, color: colors.ink }}>
+                <strong>AI use:</strong> {submission.quiz.policy_concern}
+              </p>
+            )}
+            {submission.reportCard?.comprehension && !submission.reportCard.comprehension.passed && (
+              <p style={{ margin: 0, fontSize: 13, color: colors.ink }}>
+                <strong>Comprehension check:</strong> {submission.reportCard.comprehension.note}
+              </p>
+            )}
             <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
               Add context before your teacher reviews this — it&apos;ll be shown alongside your submission.
             </p>

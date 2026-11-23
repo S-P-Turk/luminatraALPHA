@@ -23,7 +23,7 @@ export async function GET() {
 
     const assignments = await db.orm.public.Assignment
       .where({ classId: cls.id })
-      .select("id", "open")
+      .select("id", "open", "quizOpen")
       .all();
 
     let openUnsubmitted = 0;
@@ -38,8 +38,11 @@ export async function GET() {
         if (a.open) openUnsubmitted++;
         continue;
       }
-      if (submission.status === "flagged" && submission.studentResponse == null) needsResponse++;
-      else if (submission.quiz != null && submission.quizAnswers == null) needsAnswers++;
+      // Students respond to flags only after taking the quiz, and the quiz
+      // only counts as a to-do once the teacher has activated it.
+      if (submission.quiz != null && submission.quizAnswers == null) {
+        if (a.quizOpen) needsAnswers++;
+      } else if (submission.status === "flagged" && submission.studentResponse == null) needsResponse++;
     }
 
     classes.push({

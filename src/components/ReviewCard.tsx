@@ -21,9 +21,21 @@ export type ReviewSubmission = {
   quiz: ReviewQuiz | null;
   quizAnswers: string[] | null;
   studentResponse: string | null;
+  reportCard?: {
+    comprehension?: { passed: boolean; note: string; per_question?: { adequate: boolean; reason: string }[] };
+  } | null;
   status: string;
   createdAt: string;
 };
+
+// The separate offenses a submission can be flagged for, in display order.
+export function flagReasons(s: ReviewSubmission): { label: string; text: string }[] {
+  const out: { label: string; text: string }[] = [];
+  if (s.quiz?.policy_concern) out.push({ label: "AI-use violation", text: s.quiz.policy_concern });
+  const c = s.reportCard?.comprehension;
+  if (c && !c.passed) out.push({ label: "Failed comprehension check", text: c.note });
+  return out;
+}
 
 export const colors = {
   bg: "#F7F5F0",
@@ -68,6 +80,8 @@ export function ReviewCard({
 
   const questions = s.quiz?.quiz ?? [];
   const answered = questions.length > 0 && questions.every((_, i) => s.quizAnswers?.[i]);
+  const reasons = flagReasons(s);
+  const comprehension = s.reportCard?.comprehension;
 
   async function handleClear() {
     setBusy(true);
@@ -100,9 +114,12 @@ export function ReviewCard({
             {s.className ? `${s.className} · ` : ""}
             {s.assignmentTitle} · {new Date(s.createdAt).toLocaleDateString()}
           </div>
-          {!open && s.status === "flagged" && s.quiz?.policy_concern && (
-            <div style={{ fontSize: 13, color: colors.amber, marginTop: 4 }}>{s.quiz.policy_concern}</div>
-          )}
+          {!open && s.status === "flagged" &&
+            reasons.map((f) => (
+              <div key={f.label} style={{ fontSize: 13, color: colors.amber, marginTop: 4 }}>
+                <strong>{f.label}:</strong> {f.text}
+              </div>
+            ))}
         </div>
         <span
           style={{
@@ -131,26 +148,50 @@ export function ReviewCard({
             fontSize: 13,
           }}
         >
-          {s.quiz?.policy_concern && (
-            <div style={{ background: colors.amberBg, borderRadius: 8, padding: "8px 12px", color: colors.ink }}>
-              <strong style={{ color: colors.amber }}>Why flagged: </strong>
-              {s.quiz.policy_concern}
+          {reasons.map((f) => (
+            <div
+              key={f.label}
+              style={{ background: colors.amberBg, borderRadius: 8, padding: "8px 12px", color: colors.ink }}
+            >
+              <strong style={{ color: colors.amber }}>{f.label}: </strong>
+              {f.text}
             </div>
-          )}
+          ))}
 
           {questions.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ fontWeight: 700 }}>
                 Comprehension check{" "}
                 <span style={{ fontWeight: 400, color: colors.muted }}>
-                  {answered ? "— answered" : "— not answered yet"}
+                  {!answered
+                    ? "— not answered yet"
+                    : comprehension
+                      ? comprehension.passed
+                        ? "— passed"
+                        : "— failed"
+                      : "— answered, grading pending"}
                 </span>
               </div>
               {questions.map((q, i) => (
                 <div key={i}>
                   <div style={{ color: colors.muted }}>Q: {q.question}</div>
                   <div style={{ marginTop: 2 }}>
+                    {comprehension?.per_question?.[i] && (
+                      <span
+                        title={comprehension.per_question[i].reason}
+                        style={{
+                          color: comprehension.per_question[i].adequate ? colors.green : colors.amber,
+                          fontWeight: 700,
+                          marginRight: 4,
+                        }}
+                      >
+                        {comprehension.per_question[i].adequate ? "✓" : "✗"}
+                      </span>
+                    )}
                     A: {s.quizAnswers?.[i] ? s.quizAnswers[i] : <em style={{ color: colors.muted }}>—</em>}
+                    {comprehension?.per_question?.[i] && !comprehension.per_question[i].adequate && (
+                      <span style={{ color: colors.muted }}> ({comprehension.per_question[i].reason})</span>
+                    )}
                   </div>
                 </div>
               ))}

@@ -69,6 +69,13 @@
                   "kind": "scalar"
                 }
               },
+              "quizOpen": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "title": {
                 "nullable": false,
                 "type": {
@@ -126,6 +133,9 @@
                 },
                 "open": {
                   "column": "open"
+                },
+                "quizOpen": {
+                  "column": "quizOpen"
                 },
                 "title": {
                   "column": "title"
@@ -663,6 +673,15 @@
                   },
                   "nullable": false
                 },
+                "quizOpen": {
+                  "codecId": "pg/bool@1",
+                  "dataType": "pg/bool",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nullable": false
+                },
                 "title": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -1101,7 +1120,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "7220137619530a6beac312a83cd4f11135761f323bba7a891aa6db3eb6872e90"
+    "storageHash": "97e12b76673fc1949c83384bb872386acb5bbe0958c67dcd99a47ef6b38ccf92"
   },
   "execution": {
     "executionHash": "d64c2479453df4139d4052f82d7bf48ec1e8e8e4cfc5f4156a06169ff7f744ca",

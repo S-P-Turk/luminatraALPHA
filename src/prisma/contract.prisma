@@ -37,6 +37,9 @@ model Assignment {
   title        String
   instructions String
   open         Boolean      @default(false)
+  // Separate from `open`: students can submit while the quiz stays locked;
+  // the comprehension quiz only appears once the teacher activates it.
+  quizOpen     Boolean      @default(false)
   submissions  Submission[]
   createdAt    DateTime     @default(now()) @onCreate(now())
 }

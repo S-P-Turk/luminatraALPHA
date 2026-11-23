@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
+import { gradeIfNeeded } from "@/src/lib/grading";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/answer">) {
   const session = await getCurrentStudentSession();
@@ -21,6 +22,14 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
     return NextResponse.json({ error: "No submission found for this assignment." }, { status: 404 });
   }
 
+  const assignment = await db.orm.public.Assignment.where({ id }).select("quizOpen").first();
+  if (!assignment?.quizOpen) {
+    return NextResponse.json({ error: "Your teacher hasn't started the quiz yet." }, { status: 400 });
+  }
+  if (submission.quizAnswers != null) {
+    return NextResponse.json({ error: "You've already answered this quiz." }, { status: 409 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -33,9 +42,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
     return NextResponse.json({ error: "answers must be a list of strings." }, { status: 400 });
   }
 
-  const updated = await db.orm.public.Submission
-    .where({ id: submission.id })
-    .update({ quizAnswers: answers });
+  await db.orm.public.Submission.where({ id: submission.id }).update({ quizAnswers: answers });
 
-  return NextResponse.json({ submission: updated });
+  // Grade right away so a failed comprehension check is flagged (and the
+  // student is asked to explain) before the teacher sees it.
+  const graded = await gradeIfNeeded({ ...submission, quizAnswers: answers });
+
+  return NextResponse.json({
+    submission: { ...submission, quizAnswers: answers, reportCard: graded.reportCard, status: graded.status },
+  });
 }

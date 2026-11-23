@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
+import { gradeIfNeeded } from "@/src/lib/grading";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id]/submissions">) {
   const teacher = await getCurrentTeacher();
@@ -28,6 +29,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
       "assignmentId",
       "studentName",
       "studentEmail",
+      "assignmentText",
+      "transcript",
       "quiz",
       "quizAnswers",
       "reportCard",
@@ -51,8 +54,16 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
     assignmentTitles.set(s.assignmentId, assignment?.title ?? "Untitled assignment");
   }
 
+  const out = [];
+  for (const s of submissions) {
+    const graded = await gradeIfNeeded(s);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { assignmentText, transcript, ...rest } = s;
+    out.push({ ...rest, ...graded, assignmentTitle: assignmentTitles.get(s.assignmentId) });
+  }
+
   return NextResponse.json({
     class: { id: cls.id, name: cls.name, joinCode: cls.joinCode },
-    submissions: submissions.map((s) => ({ ...s, assignmentTitle: assignmentTitles.get(s.assignmentId) })),
+    submissions: out,
   });
 }

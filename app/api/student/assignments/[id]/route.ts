@@ -35,10 +35,23 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/ass
     .where({ assignmentId: id, studentEmail: session.email })
     .first();
 
+  // Don't send the quiz questions until the teacher activates the quiz, so
+  // students can't read them ahead of time.
+  const visibleSubmission =
+    submission && !assignment.quizOpen && submission.quiz
+      ? { ...submission, quiz: { ...(submission.quiz as object), quiz: [] } }
+      : submission;
+
   return NextResponse.json({
     student: session,
     class: cls,
-    assignment: { id: assignment.id, title: assignment.title, instructions: assignment.instructions, open: assignment.open },
-    submission: submission ?? null,
+    assignment: {
+      id: assignment.id,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      open: assignment.open,
+      quizOpen: assignment.quizOpen,
+    },
+    submission: visibleSubmission ?? null,
   });
 }

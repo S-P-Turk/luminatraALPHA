@@ -9,6 +9,7 @@ type Assignment = {
   title: string;
   instructions: string;
   open: boolean;
+  quizOpen: boolean;
   createdAt: string;
 };
 
@@ -130,6 +131,25 @@ export default function AssignmentsClient() {
       dismissSuggestion(index);
     } finally {
       setAddingIndex(null);
+    }
+  }
+
+  async function toggleQuiz(a: Assignment) {
+    setTogglingId(a.id);
+    try {
+      const res = await fetch(`/api/classes/${params.id}/assignments/${a.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizOpen: !a.quizOpen }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAssignments((prev) =>
+          prev ? prev.map((x) => (x.id === a.id ? { ...x, quizOpen: data.assignment.quizOpen } : x)) : prev
+        );
+      }
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -448,6 +468,24 @@ export default function AssignmentsClient() {
                   }}
                 >
                   {a.open ? "Close" : "Open"}
+                </button>
+                <button
+                  onClick={() => toggleQuiz(a)}
+                  disabled={togglingId === a.id}
+                  title="Students only see the comprehension quiz after you activate it."
+                  style={{
+                    background: a.quizOpen ? "#fff" : colors.ink,
+                    color: a.quizOpen ? colors.ink : "#fff",
+                    border: `1px solid ${a.quizOpen ? colors.cardBorder : colors.ink}`,
+                    borderRadius: 8,
+                    padding: "7px 14px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: togglingId === a.id ? "default" : "pointer",
+                    opacity: togglingId === a.id ? 0.6 : 1,
+                  }}
+                >
+                  {a.quizOpen ? "Quiz active — stop" : "Activate quiz"}
                 </button>
               </div>
             </div>

@@ -42,6 +42,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/cla
       id: a.id,
       title: a.title,
       open: a.open,
+      quizOpen: a.quizOpen,
       submission: submission
         ? {
             id: submission.id,
