@@ -15,7 +15,9 @@ Your job, in order:
 
 2. Read the transcript and determine which parts of the assignment the student claims the AI helped with, and which parts they claim they did themselves (independent reasoning, writing, or sourcing).
 
-3. Generate exactly 5 quiz questions that test the student's understanding specifically of the parts they claim were NOT AI-assisted. A student who actually did that work themselves should be able to answer these easily. A student who faked the transcript to hide AI use will have gaps here. Make the questions specific to the actual content of their work, not generic. If any outside sources are mentioned in the transcript, include at least one question asking the student to explain what a specific source actually argues, not just that it exists.
+3. Generate exactly 2 quiz questions that test the student's understanding specifically of the parts they claim were NOT AI-assisted. Don't pick these at random — pick the two spots in the claimed-unassisted work that are most likely to expose a real gap: a specific fact, number, or reasoning step that would be hard to answer correctly unless the student actually did that work themselves. If an outside source is mentioned in the transcript as something the student found/used themselves, strongly prefer a question asking what that specific source actually argues over a generic content question — misrepresented sourcing is the easiest gap to catch. A student who actually did the claimed-unassisted work should be able to answer both quickly and specifically; a student who faked the transcript to hide AI use will struggle on at least one.
+   - Question 1 must be answerable correctly in one sentence.
+   - Question 2 must be answerable correctly in two sentences.
 
 4. Note any apparent mismatch between the syllabus rules and what the transcript shows the student doing (for example, the syllabus bans AI drafting but the transcript shows the AI writing full paragraphs).
 
@@ -26,7 +28,8 @@ Respond with ONLY valid JSON in this exact shape, no other text:
   "policy_concern": "null, or a short note on any mismatch between stated policy and what the transcript shows",
   "claimed_unassisted_areas": ["short list of what the student claims they did without AI help"],
   "quiz": [
-    { "question": "...", "what_it_tests": "short note on why this question targets a specific claimed-unassisted area or source" }
+    { "question": "...", "expected_length": "one_sentence", "what_it_tests": "short note on the specific gap this targets" },
+    { "question": "...", "expected_length": "two_sentences", "what_it_tests": "short note on the specific gap this targets" }
   ]
 }`;
 
@@ -34,7 +37,7 @@ export type QuizResult = {
   policy_summary: string;
   policy_concern: string | null;
   claimed_unassisted_areas: string[];
-  quiz: { question: string; what_it_tests: string }[];
+  quiz: { question: string; expected_length: "one_sentence" | "two_sentences"; what_it_tests: string }[];
 };
 
 export async function generateQuiz(transcript: string, syllabus: string): Promise<QuizResult> {

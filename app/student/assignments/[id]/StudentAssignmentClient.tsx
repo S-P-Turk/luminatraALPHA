@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
-type QuizQuestion = { question: string; what_it_tests: string };
+type QuizQuestion = {
+  question: string;
+  what_it_tests: string;
+  expected_length?: "one_sentence" | "two_sentences";
+};
 type Quiz = {
   policy_summary: string;
   policy_concern: string | null;
@@ -302,11 +306,14 @@ export default function StudentAssignmentClient() {
             {submission.quiz.quiz.map((q, i) => (
               <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <label style={{ fontSize: 13, fontWeight: 600 }}>
-                  {i + 1}. {q.question}
+                  {i + 1}. {q.question}{" "}
+                  <span style={{ fontWeight: 400, color: colors.muted }}>
+                    ({q.expected_length === "two_sentences" ? "answer in two sentences" : "answer in one sentence"})
+                  </span>
                 </label>
                 <textarea
                   required
-                  rows={3}
+                  rows={q.expected_length === "two_sentences" ? 2 : 1}
                   value={answers[i] ?? ""}
                   onChange={(e) =>
                     setAnswers((prev) => {
