@@ -1,0 +1,36 @@
+// use prisma-8
+
+model Teacher {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  classes   Class[]
+  createdAt DateTime @default(now()) @onCreate(now())
+}
+
+model Class {
+  id             Int          @id @default(autoincrement())
+  name           String
+  syllabusText   String
+  quizOpen       Boolean      @default(false)
+  teacher        Teacher      @relation(fields: [teacherId], references: [id])
+  teacherId      Int
+  submissions    Submission[]
+  createdAt      DateTime     @default(now()) @onCreate(now())
+}
+
+model Submission {
+  id              Int      @id @default(autoincrement())
+  class           Class    @relation(fields: [classId], references: [id])
+  classId         Int
+  studentName     String
+  studentEmail    String
+  assignmentText  String
+  transcript      String
+  quiz            Json?
+  quizAnswers     Json?
+  reportCard      Json?
+  studentResponse String?
+  status          String   @default("submitted")
+  createdAt       DateTime @default(now()) @onCreate(now())
+  updatedAt       temporal.UpdatedAt
+}
