@@ -28,12 +28,13 @@ export type ReviewSubmission = {
   createdAt: string;
 };
 
-// The separate offenses a submission can be flagged for, in display order.
+// The separate reasons a submission can be flagged, in display order. Flags
+// are never verdicts — each one only suggests a follow-up for the teacher.
 export function flagReasons(s: ReviewSubmission): { label: string; text: string }[] {
   const out: { label: string; text: string }[] = [];
-  if (s.quiz?.policy_concern) out.push({ label: "AI-use violation", text: s.quiz.policy_concern });
+  if (s.quiz?.policy_concern) out.push({ label: "Follow up on AI use", text: s.quiz.policy_concern });
   const c = s.reportCard?.comprehension;
-  if (c && !c.passed) out.push({ label: "Failed comprehension check", text: c.note });
+  if (c && !c.passed) out.push({ label: "Follow up on comprehension", text: c.note });
   return out;
 }
 
@@ -167,8 +168,8 @@ export function ReviewCard({
                     ? "— not answered yet"
                     : comprehension
                       ? comprehension.passed
-                        ? "— passed"
-                        : "— failed"
+                        ? "— no follow-up suggested"
+                        : "— follow-up suggested"
                       : "— answered, grading pending"}
                 </span>
               </div>
@@ -185,7 +186,7 @@ export function ReviewCard({
                           marginRight: 4,
                         }}
                       >
-                        {comprehension.per_question[i].adequate ? "✓" : "✗"}
+                        {comprehension.per_question[i].adequate ? "✓" : "?"}
                       </span>
                     )}
                     A: {s.quizAnswers?.[i] ? s.quizAnswers[i] : <em style={{ color: colors.muted }}>—</em>}

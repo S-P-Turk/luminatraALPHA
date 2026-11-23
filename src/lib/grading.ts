@@ -16,8 +16,8 @@ type GradableRow = {
 
 /**
  * Grades a submission's quiz answers if they exist and haven't been graded
- * yet, saves the report card, and flags the submission if the student failed
- * the comprehension check. Returns the (possibly updated) reportCard and
+ * yet, saves the report card, and flags the submission for human follow-up
+ * if the answers don't clearly show understanding. Returns the (possibly updated) reportCard and
  * status. Grading failures are swallowed so a review page still loads; the
  * submission just stays ungraded and is retried next time.
  */
@@ -39,8 +39,8 @@ export async function gradeIfNeeded(row: GradableRow): Promise<{ reportCard: unk
   }
 
   const reportCard: ReportCard = { comprehension, gradedAt: new Date().toISOString() };
-  // A failed comprehension check is a new, separate offense, so it flags the
-  // submission even if the teacher had already cleared an AI-use concern.
+  // A comprehension follow-up is a separate reason from an AI-use concern, so
+  // it flags the submission even if the teacher already cleared that concern.
   const status = comprehension.passed ? row.status : "flagged";
 
   await db.orm.public.Submission.where({ id: row.id }).update({ reportCard, status });

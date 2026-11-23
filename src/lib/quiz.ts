@@ -21,7 +21,7 @@ Your job, in order:
 
 4. Only report a policy_concern if the transcript affirmatively shows the AI being used in a way the syllabus doesn't allow — for example, the syllabus bans AI drafting but the transcript shows the AI writing full sentences or paragraphs that plausibly ended up in the submission, or the syllabus requires disclosure and the transcript shows AI help the student didn't disclose elsewhere. Never flag a concern just because the transcript doesn't prove the student met some other requirement (number of sources, word count, formatting, etc.) — those aren't AI-use questions, they're separate grading matters outside what this tool checks, and "I can't verify this from the transcript" is not evidence of a violation. If you don't see a clear, transcript-evidenced AI-use violation, report policy_concern as an empty string.
 
-Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) naming exactly what the AI did that breaks which rule. what_it_tests is a few words. No hedging, no restating the syllabus.
+Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) describing what in the transcript a teacher should follow up on and which rule it relates to. Never state a conclusion or accuse — the teacher decides; you only point to what is worth a closer look. what_it_tests is a few words. No hedging, no restating the syllabus.
 
 Report your findings using the submit_quiz tool. Don't write any other text.`;
 
@@ -48,7 +48,7 @@ const QUIZ_TOOL: Anthropic.Tool = {
       },
       policy_concern: {
         type: "string",
-        description: "One sentence, under 25 words, naming a clear, transcript-evidenced AI-use violation (e.g. AI drafted text despite a no-drafting rule). Empty string otherwise — never flag just because something can't be verified from the transcript, like source or word counts.",
+        description: "One sentence, under 25 words, describing transcript-evidenced AI use worth a teacher follow-up and the rule it relates to (e.g. AI appears to draft text where the syllabus bans drafting). Neutral wording, no verdict. Empty string otherwise — never flag just because something can't be verified from the transcript, like source or word counts.",
       },
       claimed_unassisted_areas: {
         type: "array",
@@ -99,9 +99,9 @@ export async function generateQuiz(transcript: string, syllabus: string): Promis
 }
 
 // ---------------------------------------------------------------------------
-// Grading the student's quiz answers. Failing the comprehension check is its
-// own offense, separate from an AI-use policy concern: it means the student
-// couldn't explain work they claimed to have done themselves.
+// Checking the student's quiz answers. Answers that don't clearly show
+// understanding suggest a follow-up — a separate reason from an AI-use
+// concern. It's never a verdict; the teacher reviews and decides.
 
 export type ComprehensionResult = {
   passed: boolean;
@@ -113,9 +113,9 @@ const GRADE_SYSTEM_PROMPT = `You are part of an academic integrity tool. A stude
 
 Decide, for each answer, whether it shows the student genuinely understands that part of their own submission. An answer is adequate if it is specific and consistent with the submitted work — it doesn't need to be polished or perfectly worded. An answer is NOT adequate if it is wrong, contradicts the submission, is vague or generic enough that anyone could write it without having done the work, dodges the question, or is blank / "I don't know" / nonsense.
 
-The student fails the check if any answer is not adequate.
+Set passed to false if any answer is not adequate — this does NOT mean the student cheated, only that a teacher may want to follow up (e.g. a short conversation). Never accuse or draw conclusions about intent.
 
-Keep it short: each reason is a few words; note is one sentence (under 25 words) a teacher can read at a glance, stating what the student couldn't explain. If they passed, note is a short confirmation.
+Keep it short and neutral: each reason is a few words; note is one sentence (under 25 words) a teacher can read at a glance, saying what is worth following up on (e.g. "Couldn't describe the source cited in paragraph 2 — worth asking about."). If all answers are adequate, note is a short confirmation.
 
 Report using the submit_grade tool. Don't write any other text.`;
 

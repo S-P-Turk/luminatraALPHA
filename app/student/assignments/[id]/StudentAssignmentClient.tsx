@@ -385,12 +385,12 @@ export default function StudentAssignmentClient() {
             </h2>
             {submission.quiz?.policy_concern && (
               <p style={{ margin: 0, fontSize: 13, color: colors.ink }}>
-                <strong>AI use:</strong> {submission.quiz.policy_concern}
+                <strong>About your AI use:</strong> {submission.quiz.policy_concern}
               </p>
             )}
             {submission.reportCard?.comprehension && !submission.reportCard.comprehension.passed && (
               <p style={{ margin: 0, fontSize: 13, color: colors.ink }}>
-                <strong>Comprehension check:</strong> {submission.reportCard.comprehension.note}
+                <strong>About your quiz answers:</strong> {submission.reportCard.comprehension.note}
               </p>
             )}
             <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
