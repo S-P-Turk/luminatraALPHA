@@ -40,6 +40,13 @@
                   "kind": "scalar"
                 }
               },
+              "joinCode": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "name": {
                 "nullable": false,
                 "type": {
@@ -109,6 +116,9 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "joinCode": {
+                  "column": "joinCode"
                 },
                 "name": {
                   "column": "name"
@@ -383,6 +393,11 @@
                   },
                   "nullable": false
                 },
+                "joinCode": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                },
                 "name": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -444,7 +459,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "joinCode"
+                  ]
+                }
+              ]
             },
             "Submission": {
               "columns": {
@@ -620,7 +641,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "7ac5343c14fc78396f164cb253aaa35579aa17d083e4004bec4753fa0228129c"
+    "storageHash": "138f2801724c8c891bf4589b0d278c49d2040f2308bf6c92d87b682eaf68b235"
   },
   "execution": {
     "executionHash": "4afb389f112e73177cf8e04c68f37c675a2d0006441a993fedc6c5a7e85cb9cc",

@@ -12,6 +12,11 @@ model Class {
   name           String
   syllabusText   String
   quizOpen       Boolean      @default(false)
+  // Short code students enter to reach this class. Nullable so adding this
+  // column to an existing table never requires backfilling old rows — a
+  // class created before this feature just shows no code until recreated.
+  // (Postgres allows multiple NULLs under a unique constraint.)
+  joinCode       String?      @unique
   teacher        Teacher      @relation(fields: [teacherId], references: [id])
   teacherId      Int
   submissions    Submission[]

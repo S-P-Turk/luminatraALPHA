@@ -18,7 +18,7 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'7ac5343c14fc78396f164cb253aaa35579aa17d083e4004bec4753fa0228129c'>;
+  StorageHashBase<'138f2801724c8c891bf4589b0d278c49d2040f2308bf6c92d87b682eaf68b235'>;
 export type ExecutionHash =
   ExecutionHashBase<'4afb389f112e73177cf8e04c68f37c675a2d0006441a993fedc6c5a7e85cb9cc'>;
 export type ProfileHash =
@@ -307,6 +307,7 @@ export namespace Models {
   export type public_Class = {
     createdAt: FieldOutputTypes['public']['Class']['createdAt'];
     id: FieldOutputTypes['public']['Class']['id'];
+    joinCode: FieldOutputTypes['public']['Class']['joinCode'];
     name: FieldOutputTypes['public']['Class']['name'];
     quizOpen: FieldOutputTypes['public']['Class']['quizOpen'];
     syllabusText: FieldOutputTypes['public']['Class']['syllabusText'];
@@ -387,6 +388,12 @@ type ContractBase = Omit<
                   };
                   readonly many: false;
                 };
+                readonly joinCode: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
                 readonly name: {
                   readonly dataType: 'pg/text';
                   readonly codecId: 'pg/text@1';
@@ -417,7 +424,7 @@ type ContractBase = Omit<
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
+              uniques: readonly [{ readonly columns: readonly ['joinCode'] }];
               indexes: readonly [
                 {
                   readonly name: 'Class_teacherId_idx_bc266660';
@@ -626,6 +633,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
+              readonly joinCode: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly name: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -674,6 +685,7 @@ type ContractBase = Omit<
               readonly fields: {
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly id: { readonly column: 'id' };
+                readonly joinCode: { readonly column: 'joinCode' };
                 readonly name: { readonly column: 'name' };
                 readonly quizOpen: { readonly column: 'quizOpen' };
                 readonly syllabusText: { readonly column: 'syllabusText' };

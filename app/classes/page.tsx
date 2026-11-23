@@ -9,6 +9,7 @@ type ClassRow = {
   name: string;
   syllabusText: string;
   quizOpen: boolean;
+  joinCode: string | null;
   createdAt: string;
 };
 
@@ -173,6 +174,25 @@ export default function ClassesPage() {
                 <div style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>
                   {cls.syllabusText.slice(0, 90)}
                   {cls.syllabusText.length > 90 ? "..." : ""}
+                </div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>
+                  {cls.joinCode ? (
+                    <span>
+                      Class code:{" "}
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          color: colors.ink,
+                        }}
+                      >
+                        {cls.joinCode}
+                      </span>
+                    </span>
+                  ) : (
+                    <span style={{ color: colors.muted }}>No code (created before this feature)</span>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

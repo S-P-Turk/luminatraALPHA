@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
+import { generateJoinCode } from "@/src/lib/join-code";
 
 export async function GET() {
   const teacher = await getCurrentTeacher();
@@ -46,11 +47,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Syllabus text is too long (max 20,000 characters)." }, { status: 400 });
   }
 
-  const created = await db.orm.public.Class.create({
-    name,
-    syllabusText,
-    teacherId: teacher.id,
-  });
+  // Retry on the rare chance of a collision with an existing code.
+  let created;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      created = await db.orm.public.Class.create({
+        name,
+        syllabusText,
+        teacherId: teacher.id,
+        joinCode: generateJoinCode(),
+      });
+      break;
+    } catch {
+      if (attempt === 4) {
+        return NextResponse.json({ error: "Could not generate a class code. Try again." }, { status: 500 });
+      }
+    }
+  }
 
   return NextResponse.json({ class: created }, { status: 201 });
 }
