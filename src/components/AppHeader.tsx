@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 type Session = { teacher: string | null; student: { name: string; email: string } | null; admin: boolean };
 
@@ -51,7 +51,6 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
 // who is signed in.
 export function AppHeader() {
   const pathname = usePathname() ?? "/";
-  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
@@ -76,8 +75,10 @@ export function AppHeader() {
   async function signOut() {
     await fetch(area === "student" ? "/api/auth/student-logout" : "/api/auth/logout", { method: "POST" });
     setSession(null);
-    // Straight back to a fresh sign-in screen for the same role.
-    router.push(area === "student" ? "/student/login" : "/login");
+    // Full page load to a fresh sign-in screen for the same role. This drops
+    // every page Next.js kept alive in the background, so nothing from this
+    // account can show up for whoever signs in next on this browser.
+    window.location.assign(area === "student" ? "/student/login" : "/login");
   }
 
   const home = area === "student" && session?.student ? "/student" : area === "teacher" && session?.teacher ? "/classes" : "/";

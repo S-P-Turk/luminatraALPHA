@@ -1,10 +1,8 @@
 "use client";
 
 import { useLayoutEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "./Spinner";
-import { toast } from "./Toaster";
 
 type Role = "teacher" | "student";
 type Step = "email" | "sign_in" | "set_password" | "new";
@@ -24,7 +22,6 @@ const label: React.CSSProperties = { fontSize: 13, fontWeight: 600, display: "bl
 // either the password, or creating one (new accounts, and accounts from
 // before passwords existed).
 export function AuthForm({ role }: { role: Role }) {
-  const router = useRouter();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -89,8 +86,10 @@ export function AuthForm({ role }: { role: Role }) {
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error ?? "Something went wrong.");
-      toast(creating ? "Password saved — you're signed in." : "Welcome back.");
-      router.push(role === "teacher" ? "/classes" : "/student");
+      // Full page load, not router.push: Next.js keeps recently visited pages
+      // alive in the background, and a soft navigation could briefly show the
+      // previous account's data under the new one.
+      window.location.assign(role === "teacher" ? "/classes" : "/student");
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
