@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { colors } from "@/src/components/ReviewCard";
 import type { CaseResult } from "@/src/lib/eval/run-case";
+import { toast } from "@/src/components/Toaster";
 
 type CaseInfo = { id: string; course: string; scenario: string; expect: "review" | "no_review" | "either" };
 type Scoring = { version: string; weights: { textMatch: number; policy: number; comprehension: number }; threshold: number };
@@ -93,6 +94,49 @@ export default function AdminClient() {
   const fn = judged.filter((r) => r.info.expect === "review" && r.result!.actual === "no_review");
   const errored = rows.filter((r) => r.state === "error");
   const finished = rows.filter((r) => r.state === "done" || r.state === "error").length;
+
+  // Plain-text report for pasting into a chat: summary, then full detail on
+  // every wrong or borderline case, then a one-line-per-case table.
+  async function copyResults() {
+    const lines: string[] = [];
+    lines.push(
+      `Luminatra test set — scoring ${scoring?.version}, weights text ${scoring?.weights.textMatch}/rules ${scoring?.weights.policy}/comp ${scoring?.weights.comprehension}, threshold ${scoring?.threshold}`
+    );
+    lines.push(
+      `Accuracy ${correct}/${judged.length}` +
+        ` | false positives: ${fp.map((r) => r.info.id).join(", ") || "none"}` +
+        ` | false negatives: ${fn.map((r) => r.info.id).join(", ") || "none"}` +
+        ` | errors: ${errored.map((r) => r.info.id).join(", ") || "none"}`
+    );
+    const notable = done.filter((r) => r.result!.correct !== true);
+    for (const r of notable) {
+      const res = r.result!;
+      lines.push("", `=== ${res.id} (${res.correct === null ? "borderline" : "WRONG"}) — ${res.scenario}`);
+      lines.push(`Course: ${res.course}`, `Expected: ${res.expect} (${res.why}) | Got: ${res.actual}, score ${res.card.score}`);
+      for (const k of ["textMatch", "policy", "comprehension"] as const) {
+        const sig = res.card.signals[k];
+        lines.push(`  ${k} ${sig.points}/${sig.max}: ${sig.reason || "-"}`);
+      }
+      lines.push(`  policy_severity: ${res.quiz.policy_severity ?? "-"} | policy_concern: ${res.quiz.policy_concern || "-"}`);
+      lines.push(`  ai_passages: ${JSON.stringify(res.quiz.ai_passages ?? [])}`);
+      res.quiz.quiz.forEach((q, i) => lines.push(`  Q${i + 1}: ${q.question}`, `  A${i + 1}: ${res.answers[i]}`));
+    }
+    lines.push("", "All cases:");
+    for (const r of rows) {
+      const res = r.result;
+      lines.push(
+        res
+          ? `${res.correct === null ? "~" : res.correct ? "ok" : "XX"} ${res.id} score ${res.card.score} [t${res.card.signals.textMatch.points} p${res.card.signals.policy.points} c${res.card.signals.comprehension.points}] expect ${res.expect} got ${res.actual}`
+          : `${r.state === "error" ? "ERR" : "--"} ${r.info.id} ${r.error ?? ""}`
+      );
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      toast("Results copied — paste them into your chat.");
+    } catch {
+      toast("Couldn't copy automatically. Try again, or select the table text.", "error");
+    }
+  }
 
   const shell = (children: React.ReactNode) => (
     <main
@@ -191,7 +235,24 @@ export default function AdminClient() {
           <br />
           About 3 Claude calls per case (~$1–2 for a full run, a few minutes).
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {done.length > 0 && !running && (
+            <button
+              onClick={copyResults}
+              style={{
+                background: "#fff",
+                color: colors.ink,
+                border: `1px solid ${colors.cardBorder}`,
+                borderRadius: 8,
+                padding: "9px 14px",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Copy results
+            </button>
+          )}
           {errored.length > 0 && !running && (
             <button
               onClick={() => runAll(errored.map((r) => r.info.id))}
