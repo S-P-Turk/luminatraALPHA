@@ -6,9 +6,9 @@ import { ContributionMapView } from "./ContributionMapView";
 import { toast } from "./Toaster";
 
 export const SIGNAL_LABELS = {
-  textMatch: "Copied from AI",
-  policy: "Syllabus AI rules",
   comprehension: "Comprehension check",
+  reliance: "AI reliance",
+  policy: "Syllabus AI rules",
 } as const;
 
 export function scoreOf(s: { reportCard?: { scoreCard?: ScoreCard } | null }): number | null {
@@ -235,7 +235,9 @@ export function ReviewCard({
             ))
           )}
 
-          {card?.contribution && <ContributionMapView map={card.contribution} text={s.assignmentText} />}
+          {card?.contribution && (
+            <ContributionMapView map={card.contribution} reliance={card.reliance} text={s.assignmentText} />
+          )}
 
           {questions.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

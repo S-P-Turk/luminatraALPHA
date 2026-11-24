@@ -1,0 +1,152 @@
+// AI reliance: how much of a submission's substance came from AI — ideas as
+// well as wording — rated paragraph by paragraph.
+//
+// The analyzer proposes a rating per paragraph with the AI reply it came
+// from. This code decides what counts:
+//   - a rating only stands if its cited source really is in the AI's side of
+//     the transcript, or the paragraph contains verified copied/paraphrased
+//     AI text (from the contribution map);
+//   - verified copied text sets a floor the analyzer can't go under, so a
+//     mostly-copied paragraph is "written by AI" even if the analyzer
+//     under-rates it;
+//   - reliance is the word-weighted average over the whole submission.
+
+import type { ParagraphReliance } from "./quiz";
+import { aiTurns, tokenize, type ContributionMap } from "./contribution";
+import { splitParagraphs } from "./paragraphs";
+
+export type RelianceLevel = "none" | "ideas" | "heavy" | "written";
+
+export const LEVEL_WEIGHT: Record<RelianceLevel, number> = { none: 0, ideas: 0.35, heavy: 0.7, written: 1 };
+const RANK: Record<RelianceLevel, number> = { none: 0, ideas: 1, heavy: 2, written: 3 };
+
+export type ParagraphResult = {
+  index: number;
+  start: number;
+  end: number;
+  words: number;
+  level: RelianceLevel;
+  disclosed: boolean;
+  note: string;
+  source: string | null;
+  evidence: "source" | "copied-text" | "none";
+};
+
+export type RelianceResult = {
+  reliance: number; // 0..1, undisclosed only — this is what's scored
+  disclosedReliance: number; // 0..1, shown but not scored
+  percent: Record<RelianceLevel | "disclosed", number>; // share of words by level
+  paragraphs: ParagraphResult[];
+  rejected: number;
+  legacy: boolean; // no per-paragraph ratings; floors from copied text only
+};
+
+function ngrams(ws: string[], n: number): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i + n <= ws.length; i++) out.add(ws.slice(i, i + n).join(" "));
+  return out;
+}
+
+function sourceVerified(excerpt: string, aiGrams: Set<string>): boolean {
+  const ws = tokenize(excerpt).map((t) => t.word);
+  if (ws.length < 5) return false;
+  const own = ngrams(ws, 5);
+  let hit = 0;
+  for (const g of own) if (aiGrams.has(g)) hit++;
+  return own.size > 0 && hit / own.size >= 0.8;
+}
+
+const maxLevel = (a: RelianceLevel, b: RelianceLevel) => (RANK[a] >= RANK[b] ? a : b);
+
+export function computeReliance(input: {
+  submission: string;
+  transcript: string;
+  ratings: ParagraphReliance[] | undefined;
+  contribution: ContributionMap;
+}): RelianceResult {
+  const paras = splitParagraphs(input.submission);
+  const tokens = tokenize(input.submission);
+  const aiText = aiTurns(input.transcript) ?? input.transcript;
+  const aiGrams = ngrams(tokenize(aiText).map((t) => t.word), 5);
+
+  // Undisclosed copied/paraphrased words per paragraph, from the verified map.
+  const segs = input.contribution.segments.filter((s) => s.kind === "copied" || s.kind === "paraphrased");
+  const kindAt = (pos: number) => segs.find((s) => pos >= s.start && pos < s.end)?.kind;
+
+  let rejected = 0;
+  const results: ParagraphResult[] = paras.map((p) => {
+    const ptoks = tokens.filter((t) => t.start >= p.start && t.end <= p.end);
+    const words = ptoks.length;
+    let copied = 0;
+    let paraphrased = 0;
+    for (const t of ptoks) {
+      const k = kindAt(t.start);
+      if (k === "copied") copied++;
+      else if (k === "paraphrased") paraphrased++;
+    }
+    const share = words ? copied / words : 0;
+    const shareAny = words ? (copied + paraphrased) / words : 0;
+    const floor: RelianceLevel = share >= 0.6 ? "written" : shareAny >= 0.3 ? "heavy" : shareAny > 0 ? "ideas" : "none";
+
+    const rating = input.ratings?.find((r) => r.index === p.index);
+    let level: RelianceLevel = "none";
+    let disclosed = false;
+    let note = "";
+    let source: string | null = null;
+    let evidence: ParagraphResult["evidence"] = "none";
+
+    if (rating && rating.reliance !== "none") {
+      const verified = rating.ai_source_excerpt ? sourceVerified(rating.ai_source_excerpt, aiGrams) : false;
+      if (verified || floor !== "none") {
+        level = rating.reliance;
+        disclosed = rating.disclosed;
+        note = rating.note;
+        source = verified ? rating.ai_source_excerpt : null;
+        evidence = verified ? "source" : "copied-text";
+      } else {
+        rejected++; // a rating with no real AI source behind it doesn't count
+      }
+    }
+
+    // Mechanical evidence of undisclosed copying can't be rated away.
+    if (RANK[floor] > RANK[level] || (floor !== "none" && disclosed)) {
+      level = maxLevel(level, floor);
+      disclosed = false;
+      if (evidence === "none") evidence = "copied-text";
+      if (!note) note = floor === "written" ? "Mostly copied from an AI reply." : "Closely follows AI-written text.";
+    }
+
+    return { index: p.index, start: p.start, end: p.end, words, level, disclosed, note, source, evidence };
+  });
+
+  const total = results.reduce((n, p) => n + p.words, 0) || 1;
+  let reliance = 0;
+  let disclosedReliance = 0;
+  const byLevel = { none: 0, ideas: 0, heavy: 0, written: 0, disclosed: 0 };
+  for (const p of results) {
+    const w = LEVEL_WEIGHT[p.level] * p.words;
+    if (p.level !== "none" && p.disclosed) {
+      disclosedReliance += w;
+      byLevel.disclosed += p.words;
+    } else {
+      reliance += w;
+      byLevel[p.level] += p.words;
+    }
+  }
+  const pct = (n: number) => Math.round((100 * n) / total);
+
+  return {
+    reliance: reliance / total,
+    disclosedReliance: disclosedReliance / total,
+    percent: {
+      none: pct(byLevel.none),
+      ideas: pct(byLevel.ideas),
+      heavy: pct(byLevel.heavy),
+      written: pct(byLevel.written),
+      disclosed: pct(byLevel.disclosed),
+    },
+    paragraphs: results,
+    rejected,
+    legacy: input.ratings === undefined,
+  };
+}

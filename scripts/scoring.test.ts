@@ -37,124 +37,175 @@ function t(name: string, fn: () => void) {
   console.log("ok -", name);
 }
 
-// ---------------- scoring (v1 behavior preserved) ----------------
+// ---------------- scoring v3: weights comprehension 45 / reliance 30 / policy 25 ----------------
 
-t("clean submission scores 0, no review, 100% student", () => {
+// Two paragraphs: the student's own, then an AI paragraph pasted in.
+const twoPara = `${own}\n\n${aiPara}`;
+const rate = (index: number, reliance: "none" | "ideas" | "heavy" | "written", over: Record<string, unknown> = {}) => ({
+  index,
+  reliance,
+  disclosed: false,
+  note: "n",
+  ai_source_excerpt: reliance === "none" ? "" : aiPara,
+  ...over,
+});
+const weak = (n: number) => ({
+  passed: n === 0,
+  note: "n",
+  per_question: [0, 1].map((i) => ({ adequate: i >= n, reason: "" })),
+});
+
+t("clean submission scores 0, no review", () => {
   const c = scoreSubmission({
-    quiz: base,
+    quiz: { ...base, paragraphs: [rate(1, "none")] },
     submissionText: own,
     transcript: "User: hi",
-    comprehension: { passed: true, note: "Fine.", per_question: [{ adequate: true, reason: "" }, { adequate: true, reason: "" }] },
+    comprehension: weak(0),
   });
   assert.equal(c.score, 0);
   assert.equal(c.needsReview, false);
-  assert.equal(c.contribution.percent.student, 100);
+  assert.equal(c.reliance.percent.none, 100);
 });
 
-t("undisclosed copied AI text maxes text match", () => {
-  const c = scoreSubmission({ quiz: { ...base, ai_passages: [copied()] }, submissionText: submission, transcript });
-  assert.equal(c.signals.textMatch.value, 1);
+t("AI-written paragraph, undisclosed: reliance ~46% -> ~28/30", () => {
+  const c = scoreSubmission({
+    quiz: { ...base, ai_passages: [copied()], paragraphs: [rate(1, "none"), rate(2, "written")] },
+    submissionText: twoPara,
+    transcript,
+  });
+  assert.ok(c.reliance.reliance > 0.4 && c.reliance.reliance < 0.5, `reliance ${c.reliance.reliance}`);
+  assert.ok(c.signals.reliance.points >= 26 && c.signals.reliance.points <= 30, `points ${c.signals.reliance.points}`);
+  assert.match(c.signals.reliance.reason, /¶2 written by AI/);
+});
+
+t("copied text sets a floor even if the analyzer under-rates it", () => {
+  const c = scoreSubmission({
+    quiz: { ...base, ai_passages: [copied()], paragraphs: [rate(1, "none"), rate(2, "none")] },
+    submissionText: twoPara,
+    transcript,
+  });
+  assert.equal(c.reliance.paragraphs[1].level, "written");
+  assert.equal(c.reliance.paragraphs[1].evidence, "copied-text");
+});
+
+t("'ideas' reliance with a verified AI source counts at 0.35", () => {
+  const ideaPara = "Because the reparations were so harsh, I argue they destabilized the economy and made people resentful enough to back extremists.";
+  const c = scoreSubmission({
+    quiz: { ...base, paragraphs: [rate(1, "none"), rate(2, "ideas")] },
+    submissionText: `${own}\n\n${ideaPara}`,
+    transcript,
+  });
+  assert.equal(c.reliance.paragraphs[1].level, "ideas");
+  assert.equal(c.reliance.paragraphs[1].evidence, "source");
+  const expected = (0.35 * c.reliance.paragraphs[1].words) / (c.reliance.paragraphs[0].words + c.reliance.paragraphs[1].words);
+  assert.ok(Math.abs(c.reliance.reliance - expected) < 0.01);
+});
+
+t("a rating with no real AI source (and no copied text) is rejected", () => {
+  const c = scoreSubmission({
+    quiz: { ...base, paragraphs: [rate(1, "heavy", { ai_source_excerpt: "Something the AI never actually said in this chat at all." })] },
+    submissionText: own,
+    transcript,
+  });
+  assert.equal(c.reliance.paragraphs[0].level, "none");
+  assert.equal(c.reliance.rejected, 1);
+  assert.equal(c.signals.reliance.points, 0);
+});
+
+t("citing the student's own message as the 'AI source' is rejected", () => {
+  const tr = `User: Here's my draft: ${own}\nAssistant: Nice work, consider adding a source.`;
+  const c = scoreSubmission({
+    quiz: { ...base, paragraphs: [rate(1, "written", { ai_source_excerpt: own })] },
+    submissionText: own,
+    transcript: tr,
+  });
+  assert.equal(c.reliance.paragraphs[0].level, "none");
+});
+
+t("disclosed reliance is shown but scores 0", () => {
+  const c = scoreSubmission({
+    quiz: { ...base, ai_passages: [copied({ claimed_as_own: false })], paragraphs: [rate(1, "none"), rate(2, "written", { disclosed: true })] },
+    submissionText: twoPara,
+    transcript,
+  });
+  assert.equal(c.signals.reliance.points, 0);
+  assert.ok(c.reliance.disclosedReliance > 0.4);
+  assert.ok(c.reliance.percent.disclosed > 40);
+});
+
+t("analyzer says 'disclosed' but undisclosed copied text is proven: counts", () => {
+  const c = scoreSubmission({
+    quiz: { ...base, ai_passages: [copied()], paragraphs: [rate(1, "none"), rate(2, "written", { disclosed: true })] },
+    submissionText: twoPara,
+    transcript,
+  });
+  assert.equal(c.reliance.paragraphs[1].disclosed, false);
+  assert.ok(c.signals.reliance.points > 20);
+});
+
+t("weights: one weak answer alone = 23, no review", () => {
+  const c = scoreSubmission({ quiz: base, submissionText: own, transcript, comprehension: weak(1) });
+  assert.equal(c.score, 23);
+  assert.equal(c.needsReview, false);
+});
+
+t("weights: both answers weak alone = 45, review", () => {
+  const c = scoreSubmission({ quiz: base, submissionText: own, transcript, comprehension: weak(2) });
   assert.equal(c.score, 45);
   assert.equal(c.needsReview, true);
-  assert.match(c.signals.textMatch.reason, /% copied from AI, not disclosed/);
-  assert.ok(c.contribution.percent.copied > 40 && c.contribution.percent.copied < 55);
 });
 
-t("disclosed AI text: 0 points, shown as AI-assisted", () => {
-  const c = scoreSubmission({ quiz: { ...base, ai_passages: [copied({ claimed_as_own: false })] }, submissionText: submission, transcript });
-  assert.equal(c.score, 0);
-  assert.equal(c.contribution.words.copied, 0);
-  assert.ok(c.contribution.words.assisted > 0);
-});
-
-t("student's own words claimed as AI (not in transcript) are rejected", () => {
-  const c = scoreSubmission({
-    quiz: { ...base, ai_passages: [copied({ submission_excerpt: own, transcript_excerpt: own })] },
-    submissionText: submission,
-    transcript,
-  });
-  assert.equal(c.signals.textMatch.value, 0);
-  assert.equal(c.contribution.rejected, 1);
-});
-
-t("excerpt that isn't in the submission is rejected", () => {
-  const fake = "The treaty made Germany pay huge reparations which wrecked the economy and made everyone angry about it.";
-  const c = scoreSubmission({
-    quiz: { ...base, ai_passages: [copied({ submission_excerpt: fake, transcript_excerpt: fake })] },
-    submissionText: submission,
-    transcript: transcript + " " + fake,
-  });
-  assert.equal(c.signals.textMatch.value, 0);
-});
-
-t("case and punctuation changes still match", () => {
-  const c = scoreSubmission({
-    quiz: { ...base, ai_passages: [copied({ submission_excerpt: aiPara.toUpperCase().replace(/,/g, ";") })] },
-    submissionText: submission,
-    transcript,
-  });
-  assert.equal(c.signals.textMatch.value, 1);
-});
-
-t("clear policy concern alone: 30 points but still goes to review (maxed signal)", () => {
+t("weights: clear policy concern alone = 25, review via maxed rule", () => {
   const c = scoreSubmission({ quiz: { ...base, policy_concern: "AI drafted paragraph 2.", policy_severity: "clear" }, submissionText: own, transcript });
-  assert.equal(c.score, 30);
-  assert.equal(c.needsReview, true);
-});
-
-t("minor policy concern alone: 15, no review", () => {
-  const c = scoreSubmission({ quiz: { ...base, policy_concern: "Light AI rewording.", policy_severity: "minor" }, submissionText: own, transcript });
-  assert.equal(c.score, 15);
-  assert.equal(c.needsReview, false);
-});
-
-t("one weak quiz answer alone: 13, no review", () => {
-  const c = scoreSubmission({
-    quiz: base,
-    submissionText: own,
-    transcript,
-    comprehension: { passed: false, note: "Q2 vague.", per_question: [{ adequate: true, reason: "" }, { adequate: false, reason: "vague" }] },
-  });
-  assert.equal(c.score, 13);
-  assert.equal(c.needsReview, false);
-});
-
-t("both quiz answers weak alone: 25, review (maxed)", () => {
-  const c = scoreSubmission({
-    quiz: base,
-    submissionText: own,
-    transcript,
-    comprehension: { passed: false, note: "Both vague.", per_question: [{ adequate: false, reason: "" }, { adequate: false, reason: "" }] },
-  });
   assert.equal(c.score, 25);
   assert.equal(c.needsReview, true);
 });
 
-t("everything maxed: 100", () => {
+t("weights: minor policy concern alone = 13, no review", () => {
+  const c = scoreSubmission({ quiz: { ...base, policy_concern: "Light AI rewording.", policy_severity: "minor" }, submissionText: own, transcript });
+  assert.equal(c.score, 13);
+  assert.equal(c.needsReview, false);
+});
+
+t("weak answer + AI-written paragraph together reach review", () => {
   const c = scoreSubmission({
-    quiz: { ...base, policy_concern: "x", policy_severity: "clear", ai_passages: [copied()] },
-    submissionText: submission,
+    quiz: { ...base, ai_passages: [copied()], paragraphs: [rate(1, "none"), rate(2, "written")] },
+    submissionText: twoPara,
     transcript,
-    comprehension: { passed: false, note: "n", per_question: [{ adequate: false, reason: "" }, { adequate: false, reason: "" }] },
+    comprehension: weak(1),
+  });
+  assert.ok(c.score >= 40, `score ${c.score}`);
+  assert.equal(c.needsReview, true);
+});
+
+t("everything maxed: 100", () => {
+  const all = `${aiPara}`;
+  const c = scoreSubmission({
+    quiz: { ...base, policy_concern: "x", policy_severity: "clear", ai_passages: [copied()], paragraphs: [rate(1, "written")] },
+    submissionText: all,
+    transcript,
+    comprehension: weak(2),
   });
   assert.equal(c.score, 100);
 });
 
-t("legacy analysis (no passages field) shows 'Not checked'", () => {
-  const legacy = { ...base, policy_severity: undefined, ai_passages: undefined, usage_summary: undefined, policy_concern: "AI wrote it." };
+t("legacy analysis (no passages, no ratings) shows 'Not checked'", () => {
+  const legacy = { ...base, policy_severity: undefined, ai_passages: undefined, paragraphs: undefined, usage_summary: undefined, policy_concern: "AI wrote it." };
   const c = scoreSubmission({ quiz: legacy, submissionText: own, transcript });
   assert.equal(c.signals.policy.value, 1);
-  assert.match(c.signals.textMatch.reason, /Not checked/);
+  assert.match(c.signals.reliance.reason, /Not checked/);
 });
 
-t("v1-format passages (no kind/source) still count as copies", () => {
-  const c = scoreSubmission({
-    quiz: { ...base, ai_passages: [{ submission_excerpt: aiPara, claimed_as_own: true }] },
-    submissionText: submission,
-    transcript,
-  });
-  assert.equal(c.signals.textMatch.value, 1);
-  assert.equal(c.contribution.legacy, true);
+t("v2 analysis (passages, no ratings) still scores from copied text", () => {
+  const c = scoreSubmission({ quiz: { ...base, ai_passages: [copied()], paragraphs: undefined }, submissionText: twoPara, transcript });
+  assert.equal(c.reliance.legacy, true);
+  assert.equal(c.reliance.paragraphs[1].level, "written");
+  assert.ok(c.signals.reliance.points > 20);
+});
+
+t("paragraph splitting falls back to single newlines", () => {
+  const c = scoreSubmission({ quiz: base, submissionText: `${own}\n${aiPara}`, transcript });
+  assert.equal(c.reliance.paragraphs.length, 2);
 });
 
 // ---------------- contribution map ----------------
@@ -175,9 +226,8 @@ t("paraphrase: verified against its source, half weight", () => {
   const m = c.contribution;
   assert.ok(m.words.paraphrased > 15, `paraphrased words ${m.words.paraphrased}`);
   assert.equal(m.words.copied, 0);
-  // ~19 of ~41 words paraphrased -> share ~0.23 after half weight -> value ~0.77
-  assert.ok(c.signals.textMatch.value > 0.6 && c.signals.textMatch.value < 0.9, `value ${c.signals.textMatch.value}`);
-  assert.match(c.signals.textMatch.reason, /closely paraphrased/);
+  // The paraphrase alone floors its paragraph to at least "heavy".
+  assert.ok(c.signals.reliance.points > 0);
 });
 
 t("paraphrase whose 'source' isn't in the transcript is rejected", () => {

@@ -14,7 +14,7 @@ async function main() {
   const prefix = process.argv[2] ?? "";
   const cases = CASES.filter((c) => c.id.startsWith(prefix));
   console.log(
-    `Scoring ${SCORING_VERSION} | weights text ${WEIGHTS.textMatch} / policy ${WEIGHTS.policy} / comprehension ${WEIGHTS.comprehension} | threshold ${REVIEW_THRESHOLD}\nRunning ${cases.length} cases...\n`
+    `Scoring ${SCORING_VERSION} | weights comprehension ${WEIGHTS.comprehension} / reliance ${WEIGHTS.reliance} / policy ${WEIGHTS.policy} | threshold ${REVIEW_THRESHOLD}\nRunning ${cases.length} cases...\n`
   );
 
   const results: CaseResult[] = [];
@@ -33,7 +33,7 @@ async function main() {
       const s = r.card.signals;
       const mark = r.correct === null ? "~  " : r.correct ? "ok " : "XX ";
       console.log(
-        `${mark} ${r.id}  score ${String(r.card.score).padStart(3)}  [text ${s.textMatch.points} | policy ${s.policy.points} | comp ${s.comprehension.points}]  expect ${r.expect.padEnd(9)} got ${r.actual.padEnd(9)} ${r.scenario}`
+        `${mark} ${r.id}  score ${String(r.card.score).padStart(3)}  [comp ${s.comprehension.points} | reliance ${s.reliance.points} | policy ${s.policy.points}]  expect ${r.expect.padEnd(9)} got ${r.actual.padEnd(9)} ${r.scenario}`
       );
     }
   }

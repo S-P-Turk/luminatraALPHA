@@ -6,7 +6,7 @@ import type { CaseResult } from "@/src/lib/eval/run-case";
 import { toast } from "@/src/components/Toaster";
 
 type CaseInfo = { id: string; course: string; scenario: string; expect: "review" | "no_review" | "either" };
-type Scoring = { version: string; weights: { textMatch: number; policy: number; comprehension: number }; threshold: number };
+type Scoring = { version: string; weights: { comprehension: number; reliance: number; policy: number }; threshold: number };
 type Row = { info: CaseInfo; state: "idle" | "running" | "done" | "error"; result?: CaseResult; error?: string };
 
 const CONCURRENCY = 3;
@@ -123,7 +123,7 @@ export default function AdminClient() {
   async function copyResults() {
     const lines: string[] = [];
     lines.push(
-      `Luminatra test set — scoring ${scoring?.version}, weights text ${scoring?.weights.textMatch}/rules ${scoring?.weights.policy}/comp ${scoring?.weights.comprehension}, threshold ${scoring?.threshold}`
+      `Luminatra test set — scoring ${scoring?.version}, weights comp ${scoring?.weights.comprehension}/reliance ${scoring?.weights.reliance}/rules ${scoring?.weights.policy}, threshold ${scoring?.threshold}`
     );
     lines.push(
       `Accuracy ${correct}/${judged.length}` +
@@ -136,7 +136,7 @@ export default function AdminClient() {
       const res = r.result!;
       lines.push("", `=== ${res.id} (${res.correct === null ? "borderline" : "WRONG"}) — ${res.scenario}`);
       lines.push(`Course: ${res.course}`, `Expected: ${res.expect} (${res.why}) | Got: ${res.actual}, score ${res.card.score}`);
-      for (const k of ["textMatch", "policy", "comprehension"] as const) {
+      for (const k of ["comprehension", "reliance", "policy"] as const) {
         const sig = res.card.signals[k];
         lines.push(`  ${k} ${sig.points}/${sig.max}: ${sig.reason || "-"}`);
       }
@@ -149,7 +149,7 @@ export default function AdminClient() {
       const res = r.result;
       lines.push(
         res
-          ? `${res.correct === null ? "~" : res.correct ? "ok" : "XX"} ${res.id} score ${res.card.score} [t${res.card.signals.textMatch.points} p${res.card.signals.policy.points} c${res.card.signals.comprehension.points}] expect ${res.expect} got ${res.actual}`
+          ? `${res.correct === null ? "~" : res.correct ? "ok" : "XX"} ${res.id} score ${res.card.score} [c${res.card.signals.comprehension.points} r${res.card.signals.reliance.points} p${res.card.signals.policy.points}] expect ${res.expect} got ${res.actual}`
           : `${r.state === "error" ? "ERR" : "--"} ${r.info.id} ${r.error ?? ""}`
       );
     }
@@ -300,8 +300,8 @@ export default function AdminClient() {
         }}
       >
         <div style={{ color: colors.muted }}>
-          {rows.length} cases · scoring {scoring?.version} · weights text {scoring?.weights.textMatch} / rules{" "}
-          {scoring?.weights.policy} / comprehension {scoring?.weights.comprehension} · review at{" "}
+          {rows.length} cases · scoring {scoring?.version} · weights comprehension {scoring?.weights.comprehension} / AI reliance{" "}
+          {scoring?.weights.reliance} / rules {scoring?.weights.policy} · review at{" "}
           {scoring?.threshold}+ or any maxed signal
           <br />
           About 3 Claude calls per case (~$1–2 for a full run, a few minutes).
@@ -421,10 +421,10 @@ export default function AdminClient() {
                       <div style={{ color: colors.muted }}>
                         {res.course} — {res.why}
                       </div>
-                      {(["textMatch", "policy", "comprehension"] as const).map((k) => (
+                      {(["comprehension", "reliance", "policy"] as const).map((k) => (
                         <div key={k}>
                           <strong>
-                            {k === "textMatch" ? "Copied from AI" : k === "policy" ? "Syllabus rules" : "Comprehension"}{" "}
+                            {k === "reliance" ? "AI reliance" : k === "policy" ? "Syllabus rules" : "Comprehension"}{" "}
                             {res.card.signals[k].points}/{res.card.signals[k].max}:
                           </strong>{" "}
                           {res.card.signals[k].reason || <span style={{ color: colors.muted }}>nothing notable</span>}
