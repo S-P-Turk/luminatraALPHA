@@ -40,6 +40,9 @@ export type CaseResult = {
   why: string;
   actual: "review" | "no_review";
   correct: boolean | null; // null for borderline ("either") cases
+  relianceExpected: EvalCase["expectReliance"] | null;
+  relianceActual: "none" | "ideas" | "heavy" | "written";
+  relianceCorrect: boolean | null; // null when the case has no reliance answer key
   card: ScoreCard;
   quiz: QuizResult;
   answers: string[];
@@ -52,6 +55,12 @@ export async function runCase(c: EvalCase): Promise<CaseResult> {
   const comprehension = await gradeAnswers({ assignmentText: c.submission, transcript: c.transcript, quiz, answers });
   const card = scoreSubmission({ quiz, submissionText: c.submission, transcript: c.transcript, comprehension });
   const actual = card.needsReview ? "review" : "no_review";
+  // Highest reliance level on any paragraph, disclosed or not.
+  const rank = { none: 0, ideas: 1, heavy: 2, written: 3 } as const;
+  const relianceActual = card.reliance.paragraphs.reduce<"none" | "ideas" | "heavy" | "written">(
+    (best, p) => (rank[p.level] > rank[best] ? p.level : best),
+    "none"
+  );
   return {
     id: c.id,
     course: c.course,
@@ -60,6 +69,9 @@ export async function runCase(c: EvalCase): Promise<CaseResult> {
     why: c.why,
     actual,
     correct: c.expect === "either" ? null : actual === c.expect,
+    relianceExpected: c.expectReliance ?? null,
+    relianceActual,
+    relianceCorrect: c.expectReliance ? relianceActual === c.expectReliance : null,
     card,
     quiz,
     answers,
@@ -76,5 +88,10 @@ export function summarize(results: CaseResult[]) {
     falsePositives: judged.filter((r) => r.expect === "no_review" && r.actual === "review").map((r) => r.id),
     falseNegatives: judged.filter((r) => r.expect === "review" && r.actual === "no_review").map((r) => r.id),
     borderline: results.length - judged.length,
+    relianceJudged: results.filter((r) => r.relianceCorrect !== null).length,
+    relianceCorrect: results.filter((r) => r.relianceCorrect === true).length,
+    relianceMisses: results
+      .filter((r) => r.relianceCorrect === false)
+      .map((r) => `${r.id} (expected ${r.relianceExpected}, got ${r.relianceActual})`),
   };
 }

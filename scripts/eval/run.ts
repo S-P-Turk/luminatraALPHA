@@ -33,7 +33,7 @@ async function main() {
       const s = r.card.signals;
       const mark = r.correct === null ? "~  " : r.correct ? "ok " : "XX ";
       console.log(
-        `${mark} ${r.id}  score ${String(r.card.score).padStart(3)}  [comp ${s.comprehension.points} | reliance ${s.reliance.points} | policy ${s.policy.points}]  expect ${r.expect.padEnd(9)} got ${r.actual.padEnd(9)} ${r.scenario}`
+        `${mark} ${r.id}  score ${String(r.card.score).padStart(3)}  [comp ${s.comprehension.points} | reliance ${s.reliance.points} | policy ${s.policy.points}]  expect ${r.expect.padEnd(9)} got ${r.actual.padEnd(9)} reliance ${r.relianceExpected ?? "-"}/${r.relianceActual}${r.relianceCorrect === false ? " XX" : ""}  ${r.scenario}`
       );
     }
   }
@@ -43,6 +43,7 @@ async function main() {
   console.log(`Unneeded reviews (false positives): ${sum.falsePositives.length}  ${sum.falsePositives.join(", ")}`);
   console.log(`Missed reviews (false negatives):   ${sum.falseNegatives.length}  ${sum.falseNegatives.join(", ")}`);
   console.log(`Borderline (not scored): ${sum.borderline}  Errors: ${errors}`);
+  console.log(`Reliance labels: ${sum.relianceCorrect}/${sum.relianceJudged}  ${sum.relianceMisses.join(", ")}`);
 
   const out = `scripts/eval/results-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.json`;
   writeFileSync(out, JSON.stringify(results, null, 2));

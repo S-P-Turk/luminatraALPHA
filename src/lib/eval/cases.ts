@@ -1,6 +1,8 @@
-// Luminatra evaluation set: 3 course policies x 10 student scenarios = 30
+// Luminatra evaluation set: 3 course policies x 12 student scenarios = 36
 // synthetic cases with the outcome a reasonable integrity officer would
 // expect. "either" marks genuinely borderline cases that aren't scored.
+// expectReliance is the answer key for the AI reliance label: the highest
+// level any paragraph should get (undefined = not graded for that case).
 
 export type Expect = "review" | "no_review" | "either";
 
@@ -15,6 +17,7 @@ export type EvalCase = {
   // How the simulated student answers the comprehension quiz.
   student: "knows_work" | "vague";
   expect: Expect;
+  expectReliance?: "none" | "ideas" | "heavy" | "written";
   why: string;
 };
 
@@ -31,6 +34,10 @@ type Course = {
   aiRephrase: { before: string; after: string }; // one sentence lightly reworded
   source: string;
   aiSourceSummary: string;
+  aiArgument: string; // AI reply offering a distinctive argument
+  ideaParagraph: string; // student's own words, built on that argument
+  aiExplain: string; // AI reply explaining something in detail
+  heavyParagraph: string; // close paraphrase of aiExplain
   draftRequest: string;
 };
 
@@ -57,6 +64,14 @@ const courses: Course[] = [
     aiSourceSummary:
       "Keynes argued that the reparations demanded of Germany were economically unpayable and would impoverish Central Europe, sowing the seeds of future conflict.",
     draftRequest: "Write me a paragraph about how the Treaty of Versailles caused WWII.",
+    aiArgument:
+      "One overlooked factor is the 'stab-in-the-back' myth: because the treaty was signed by civilian politicians, nationalists could blame the Weimar Republic rather than the army for Germany's defeat.",
+    ideaParagraph:
+      "What stood out to me is that the treaty let nationalists shift the blame. Since civilians signed it, people could pretend the army never really lost, and that lie made the republic look like traitors.",
+    aiExplain:
+      "The war-guilt clause, Article 231, forced Germany to accept sole responsibility for the war, which became a symbol of national humiliation and a rallying point for revisionist politics throughout the 1920s.",
+    heavyParagraph:
+      "Article 231, the war-guilt clause, made Germany accept full responsibility for the war, and it turned into a symbol of humiliation and a rallying point for revisionist politics during the 1920s.",
   },
   {
     key: "bio",
@@ -80,6 +95,14 @@ const courses: Course[] = [
     aiSourceSummary:
       "Campbell explains that each enzyme has an optimal temperature, above which hydrogen bonds in its structure break and the protein denatures, losing function.",
     draftRequest: "Write the discussion paragraph for my catalase temperature lab.",
+    aiArgument:
+      "One way to explain the drop at low temperatures is that molecules move more slowly, so enzyme and substrate collide less often, which lowers the reaction rate without damaging the enzyme.",
+    ideaParagraph:
+      "At 10 degrees the foam was much lower too, but I don't think the enzyme was damaged. It's more that everything was moving slower in the cold, so the catalase met the peroxide less often.",
+    aiExplain:
+      "Above its optimum, catalase loses activity because heat disrupts the hydrogen bonds holding its tertiary structure together, changing the shape of the active site so hydrogen peroxide can no longer bind.",
+    heavyParagraph:
+      "Past its optimum, catalase loses activity since heat disrupts the hydrogen bonds that hold its tertiary structure together, which changes the active site's shape so hydrogen peroxide can no longer bind.",
   },
   {
     key: "phil",
@@ -102,6 +125,14 @@ const courses: Course[] = [
     aiSourceSummary:
       "Kant argues that truthfulness is an unconditional duty, so one may not lie even to a murderer asking where a friend is hiding.",
     draftRequest: "Write a paragraph explaining Kant's view on lying to the murderer at the door.",
+    aiArgument:
+      "A useful distinction is between lying and refusing to answer: Kant's view may permit staying silent or deflecting, since the duty is not to assert falsehoods, not a duty to disclose everything.",
+    ideaParagraph:
+      "Maybe the answer is that I don't have to lie or tell the truth, I can just refuse to say anything. Kant only says I can't state something false, not that I owe the murderer information.",
+    aiExplain:
+      "Kant's critics, most famously Benjamin Constant, argued that the duty to tell the truth applies only to those who have a right to the truth, and a murderer seeking a victim has forfeited that right.",
+    heavyParagraph:
+      "Kant's critics, most famously Benjamin Constant, said the duty to tell the truth only applies to people who have a right to the truth, and a murderer looking for a victim has forfeited that right.",
   },
 ];
 
@@ -118,7 +149,8 @@ function build(c: Course): EvalCase[] {
     transcript: string,
     student: EvalCase["student"],
     expect: Expect,
-    why: string
+    why: string,
+    expectReliance?: EvalCase["expectReliance"]
   ): EvalCase => ({
     id: `${c.key}-${String(n).padStart(2, "0")}`,
     course: c.name,
@@ -130,10 +162,11 @@ function build(c: Course): EvalCase[] {
     student,
     expect,
     why,
+    expectReliance,
   });
 
   return [
-    mk(1, "No AI, honest", c.ownParagraph, NO_AI, "knows_work", "no_review", "Nothing to follow up on."),
+    mk(1, "No AI, honest", c.ownParagraph, NO_AI, "knows_work", "no_review", "Nothing to follow up on.", "none"),
     mk(
       2,
       "AI brainstorm only, disclosed",
@@ -141,7 +174,8 @@ function build(c: Course): EvalCase[] {
       `User: Give me some angles for this assignment.\nAssistant: ${c.aiIdeas}`,
       "knows_work",
       noAI ? "review" : "no_review",
-      noAI ? "Syllabus bans all AI, including brainstorming." : "Brainstorming is allowed and disclosed."
+      noAI ? "Syllabus bans all AI, including brainstorming." : "Brainstorming is allowed and disclosed.",
+      "none"
     ),
     mk(
       3,
@@ -150,34 +184,38 @@ function build(c: Course): EvalCase[] {
       `User: Check the grammar in my draft: ${c.ownDraftRough}\nAssistant: ${c.aiFeedback}`,
       "knows_work",
       noAI ? "review" : "no_review",
-      noAI ? "Syllabus bans grammar checking too." : "Grammar help is allowed; student's own words."
+      noAI ? "Syllabus bans grammar checking too." : "Grammar help is allowed; student's own words.",
+      "none"
     ),
     mk(
       4,
       "AI-drafted paragraph pasted, not disclosed, student understands it",
-      `${c.ownParagraph} ${c.aiParagraph}`,
+      `${c.ownParagraph}\n\n${c.aiParagraph}`,
       `User: ${c.draftRequest}\nAssistant: ${c.aiParagraph}`,
       "knows_work",
       "review",
-      "Undisclosed AI-written text in the submission."
+      "Undisclosed AI-written text in the submission.",
+      "written"
     ),
     mk(
       5,
       "AI-drafted paragraph pasted, disclosed",
-      `${c.ownParagraph} ${c.aiParagraph}\n\nAI statement: The final two sentences were written by AI.`,
+      `${c.ownParagraph}\n\n${c.aiParagraph}\n\nAI statement: The second paragraph was written by AI.`,
       `User: ${c.draftRequest}\nAssistant: ${c.aiParagraph}`,
       "knows_work",
       permissive ? "no_review" : "review",
-      permissive ? "Drafting allowed with disclosure, and it was disclosed." : "Syllabus forbids AI-written sentences even if disclosed."
+      permissive ? "Drafting allowed with disclosure, and it was disclosed." : "Syllabus forbids AI-written sentences even if disclosed.",
+      "written"
     ),
     mk(
       6,
       "AI-drafted paragraph pasted, not disclosed, student can't explain",
-      `${c.ownParagraph} ${c.aiParagraph}`,
+      `${c.ownParagraph}\n\n${c.aiParagraph}`,
       `User: ${c.draftRequest}\nAssistant: ${c.aiParagraph}`,
       "vague",
       "review",
-      "Undisclosed AI text and weak comprehension."
+      "Undisclosed AI text and weak comprehension.",
+      "written"
     ),
     mk(
       7,
@@ -188,7 +226,8 @@ function build(c: Course): EvalCase[] {
       noAI ? "review" : "no_review",
       noAI
         ? "Any AI use breaks the no-AI rule."
-        : "Text in both transcript and submission is the student's own; must not count as AI text."
+        : "Text in both transcript and submission is the student's own; must not count as AI text.",
+      "none"
     ),
     mk(
       8,
@@ -206,7 +245,8 @@ function build(c: Course): EvalCase[] {
       NO_AI,
       "vague",
       "review",
-      "By design: weak answers on both questions reach review (comprehension maxed). Known false-positive class — teacher clears."
+      "By design: weak answers on both questions reach review (comprehension maxed). Known false-positive class — teacher clears.",
+      "none"
     ),
     mk(
       10,
@@ -216,6 +256,28 @@ function build(c: Course): EvalCase[] {
       "knows_work",
       noAI ? "review" : "either",
       noAI ? "Any AI use breaks the no-AI rule." : "Borderline: one sentence of light rewording."
+    ),
+    mk(
+      11,
+      "Built on an AI's idea, in the student's own words, not disclosed",
+      `${c.ownParagraph}\n\n${c.ideaParagraph}`,
+      `User: What's an angle most people miss on this?\nAssistant: ${c.aiArgument}`,
+      "knows_work",
+      noAI ? "review" : "either",
+      noAI
+        ? "Any AI use breaks the no-AI rule."
+        : "Borderline: idea-level help, own writing, but not disclosed. Reliance should read 'ideas'.",
+      "ideas"
+    ),
+    mk(
+      12,
+      "AI explanation closely paraphrased, not disclosed",
+      `${c.ownParagraph}\n\n${c.heavyParagraph}`,
+      `User: Explain this part for me.\nAssistant: ${c.aiExplain}`,
+      "knows_work",
+      "review",
+      "A paragraph that closely reworks an AI reply, presented as the student's own.",
+      "heavy"
     ),
   ];
 }

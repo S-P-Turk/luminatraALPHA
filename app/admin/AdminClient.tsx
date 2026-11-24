@@ -116,6 +116,9 @@ export default function AdminClient() {
   const fp = judged.filter((r) => r.info.expect === "no_review" && r.result!.actual === "review");
   const fn = judged.filter((r) => r.info.expect === "review" && r.result!.actual === "no_review");
   const errored = rows.filter((r) => r.state === "error");
+  const relJudged = done.filter((r) => r.result!.relianceCorrect !== null);
+  const relCorrect = relJudged.filter((r) => r.result!.relianceCorrect).length;
+  const relMisses = relJudged.filter((r) => r.result!.relianceCorrect === false);
   const finished = rows.filter((r) => r.state === "done" || r.state === "error").length;
 
   // Plain-text report for pasting into a chat: summary, then full detail on
@@ -131,7 +134,11 @@ export default function AdminClient() {
         ` | false negatives: ${fn.map((r) => r.info.id).join(", ") || "none"}` +
         ` | errors: ${errored.map((r) => r.info.id).join(", ") || "none"}`
     );
-    const notable = done.filter((r) => r.result!.correct !== true);
+    lines.push(
+      `Reliance labels ${relCorrect}/${relJudged.length}` +
+        ` | misses: ${relMisses.map((r) => `${r.info.id} (exp ${r.result!.relianceExpected}, got ${r.result!.relianceActual})`).join(", ") || "none"}`
+    );
+    const notable = done.filter((r) => r.result!.correct !== true || r.result!.relianceCorrect === false);
     for (const r of notable) {
       const res = r.result!;
       lines.push("", `=== ${res.id} (${res.correct === null ? "borderline" : "WRONG"}) — ${res.scenario}`);
@@ -141,6 +148,11 @@ export default function AdminClient() {
         lines.push(`  ${k} ${sig.points}/${sig.max}: ${sig.reason || "-"}`);
       }
       lines.push(`  policy_severity: ${res.quiz.policy_severity ?? "-"} | policy_concern: ${res.quiz.policy_concern || "-"}`);
+      lines.push(`  reliance: expected ${res.relianceExpected ?? "-"}, got ${res.relianceActual} (${Math.round(res.card.reliance.reliance * 100)}% undisclosed)`);
+      for (const p of res.card.reliance.paragraphs) {
+        lines.push(`    ¶${p.index} ${p.level}${p.disclosed ? " (disclosed)" : ""} [${p.evidence}] ${p.note}`);
+      }
+      lines.push(`  analyzer ratings: ${JSON.stringify(res.quiz.paragraphs ?? [])}`);
       lines.push(`  ai_passages: ${JSON.stringify(res.quiz.ai_passages ?? [])}`);
       res.quiz.quiz.forEach((q, i) => lines.push(`  Q${i + 1}: ${q.question}`, `  A${i + 1}: ${res.answers[i]}`));
     }
@@ -149,7 +161,7 @@ export default function AdminClient() {
       const res = r.result;
       lines.push(
         res
-          ? `${res.correct === null ? "~" : res.correct ? "ok" : "XX"} ${res.id} score ${res.card.score} [c${res.card.signals.comprehension.points} r${res.card.signals.reliance.points} p${res.card.signals.policy.points}] expect ${res.expect} got ${res.actual}`
+          ? `${res.correct === null ? "~" : res.correct ? "ok" : "XX"} ${res.id} score ${res.card.score} [c${res.card.signals.comprehension.points} r${res.card.signals.reliance.points} p${res.card.signals.policy.points}] expect ${res.expect} got ${res.actual} | reliance ${res.relianceExpected ?? "-"}/${res.relianceActual}${res.relianceCorrect === false ? " XX" : ""}`
           : `${r.state === "error" ? "ERR" : "--"} ${r.info.id} ${r.error ?? ""}`
       );
     }
@@ -367,6 +379,11 @@ export default function AdminClient() {
             { label: "Accuracy", value: judged.length ? `${Math.round((100 * correct) / judged.length)}%` : "—", sub: `${correct}/${judged.length} judged cases` },
             { label: "Unneeded reviews", value: String(fp.length), sub: fp.map((r) => r.info.id).join(", ") || "false positives" },
             { label: "Missed reviews", value: String(fn.length), sub: fn.map((r) => r.info.id).join(", ") || "false negatives" },
+            {
+              label: "Reliance labels",
+              value: relJudged.length ? `${Math.round((100 * relCorrect) / relJudged.length)}%` : "—",
+              sub: relMisses.map((r) => r.info.id).join(", ") || `${relCorrect}/${relJudged.length} correct`,
+            },
             { label: "Borderline / errors", value: `${done.length - judged.length} / ${errored.length}`, sub: "not scored" },
           ].map((t) => (
             <div key={t.label} style={{ background: "#fff", border: `1px solid ${colors.border}`, borderRadius: 10, padding: 14 }}>
@@ -411,6 +428,11 @@ export default function AdminClient() {
                 <span style={{ fontSize: 12, color: colors.muted }}>
                   expect {r.info.expect.replace("_", " ")}
                   {res ? ` · got ${res.actual.replace("_", " ")}` : ""}
+                  {res?.relianceCorrect === false && (
+                    <span style={{ color: colors.amber, display: "block" }}>
+                      reliance: exp {res.relianceExpected}, got {res.relianceActual}
+                    </span>
+                  )}
                 </span>
               </button>
               {openId === r.info.id && (
@@ -430,6 +452,12 @@ export default function AdminClient() {
                           {res.card.signals[k].reason || <span style={{ color: colors.muted }}>nothing notable</span>}
                         </div>
                       ))}
+                      <div>
+                        <strong>Reliance</strong> (expected {res.relianceExpected ?? "—"}, got {res.relianceActual}):{" "}
+                        {res.card.reliance.paragraphs
+                          .map((p) => `¶${p.index} ${p.level}${p.disclosed ? " (disclosed)" : ""}`)
+                          .join(" · ")}
+                      </div>
                       {res.quiz.quiz.map((q, i) => (
                         <div key={i} style={{ color: colors.muted }}>
                           Q: {q.question}
