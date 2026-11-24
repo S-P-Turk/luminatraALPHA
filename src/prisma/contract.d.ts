@@ -18,9 +18,9 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'97e12b76673fc1949c83384bb872386acb5bbe0958c67dcd99a47ef6b38ccf92'>;
+  StorageHashBase<'ed4afe96d9bab0265c7ca45832b452dee79c4127c137e5976c1457acb80b0452'>;
 export type ExecutionHash =
-  ExecutionHashBase<'d64c2479453df4139d4052f82d7bf48ec1e8e8e4cfc5f4156a06169ff7f744ca'>;
+  ExecutionHashBase<'cff0b653a1094785d10d2a8e0d8127b5765e4fcd2f4811b2178f076964d0c39c'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -339,6 +339,14 @@ export namespace Models {
     class: public_Class;
     readonly [RelationKeys]?: 'class';
   };
+  export type public_Student = {
+    createdAt: FieldOutputTypes['public']['Student']['createdAt'];
+    email: FieldOutputTypes['public']['Student']['email'];
+    id: FieldOutputTypes['public']['Student']['id'];
+    name: FieldOutputTypes['public']['Student']['name'];
+    passwordHash: FieldOutputTypes['public']['Student']['passwordHash'];
+    readonly [RelationKeys]?: never;
+  };
   export type public_Submission = {
     assignmentId: FieldOutputTypes['public']['Submission']['assignmentId'];
     assignmentText: FieldOutputTypes['public']['Submission']['assignmentText'];
@@ -362,6 +370,7 @@ export namespace Models {
     createdAt: FieldOutputTypes['public']['Teacher']['createdAt'];
     email: FieldOutputTypes['public']['Teacher']['email'];
     id: FieldOutputTypes['public']['Teacher']['id'];
+    passwordHash: FieldOutputTypes['public']['Teacher']['passwordHash'];
     classes: public_Class[];
     readonly [RelationKeys]?: 'classes';
   };
@@ -372,6 +381,7 @@ export declare const models: {
     Assignment: Models.public_Assignment;
     Class: Models.public_Class;
     Enrollment: Models.public_Enrollment;
+    Student: Models.public_Student;
     Submission: Models.public_Submission;
     Teacher: Models.public_Teacher;
   };
@@ -623,6 +633,50 @@ type ContractBase = Omit<
                 },
               ];
             };
+            readonly Student: {
+              columns: {
+                readonly createdAt: {
+                  readonly dataType: 'pg/timestamptz';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
+                  readonly many: false;
+                };
+                readonly email: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly id: {
+                  readonly dataType: 'pg/int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'function';
+                    readonly expression: 'autoincrement()';
+                  };
+                  readonly many: false;
+                };
+                readonly name: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly many: false;
+                };
+                readonly passwordHash: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['email'] }];
+              indexes: readonly [];
+              foreignKeys: readonly [];
+            };
             readonly Submission: {
               columns: {
                 readonly assignmentId: {
@@ -790,6 +844,12 @@ type ContractBase = Omit<
                   };
                   readonly many: false;
                 };
+                readonly passwordHash: {
+                  readonly dataType: 'pg/text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [{ readonly columns: readonly ['email'] }];
@@ -816,6 +876,7 @@ type ContractBase = Omit<
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'Enrollment';
     };
+    readonly Student: { readonly namespace: 'public' & NamespaceId; readonly model: 'Student' };
     readonly Submission: {
       readonly namespace: 'public' & NamespaceId;
       readonly model: 'Submission';
@@ -1049,6 +1110,46 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly Student: {
+            readonly fields: {
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-date@1';
+                  readonly typeParams: { readonly precision: 3 };
+                };
+              };
+              readonly email: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly passwordHash: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'Student';
+              readonly namespaceId: 'public';
+              readonly fields: {
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly email: { readonly column: 'email' };
+                readonly id: { readonly column: 'id' };
+                readonly name: { readonly column: 'name' };
+                readonly passwordHash: { readonly column: 'passwordHash' };
+              };
+            };
+          };
           readonly Submission: {
             readonly fields: {
               readonly assignmentId: {
@@ -1181,6 +1282,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
+              readonly passwordHash: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
             };
             readonly relations: {
               readonly classes: {
@@ -1202,6 +1307,7 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly email: { readonly column: 'email' };
                 readonly id: { readonly column: 'id' };
+                readonly passwordHash: { readonly column: 'passwordHash' };
               };
             };
           };
@@ -1277,6 +1383,18 @@ type ContractBase = Omit<
           };
           readonly ref: {
             readonly entry: 'Enrollment';
+            readonly field: 'createdAt';
+            readonly namespace: 'public';
+          };
+        },
+        {
+          readonly onCreate: {
+            readonly id: 'timestampNow';
+            readonly kind: 'generator';
+            readonly params: { readonly precision: 3 };
+          };
+          readonly ref: {
+            readonly entry: 'Student';
             readonly field: 'createdAt';
             readonly namespace: 'public';
           };

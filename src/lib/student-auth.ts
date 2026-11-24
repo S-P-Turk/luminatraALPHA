@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { readSession } from "./session";
 
 export const STUDENT_COOKIE = "student_session";
 
@@ -8,23 +9,14 @@ export type StudentSession = {
 };
 
 /**
- * Prototype-only, same spirit as teacher auth: no password, the cookie is
- * the credential. Unlike the old version, this no longer carries a classId —
- * a student's identity (name/email) is independent of any one class, and
- * which classes they belong to lives in the Enrollment table instead, so a
- * student can join more than one class with the same session.
+ * The signed-in student, from a signed session cookie. Identity is
+ * independent of any one class; class membership lives in Enrollment.
  */
 export async function getCurrentStudentSession(): Promise<StudentSession | null> {
   const store = await cookies();
-  const raw = store.get(STUDENT_COOKIE)?.value;
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed?.name === "string" && typeof parsed?.email === "string") {
-      return { name: parsed.name, email: parsed.email };
-    }
-    return null;
-  } catch {
-    return null;
+  const session = readSession<{ role?: string; name?: string; email?: string }>(store.get(STUDENT_COOKIE)?.value);
+  if (session?.role === "student" && typeof session.name === "string" && typeof session.email === "string") {
+    return { name: session.name, email: session.email };
   }
+  return null;
 }

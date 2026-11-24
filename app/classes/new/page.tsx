@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/src/components/Spinner";
+import { toast } from "@/src/components/Toaster";
 
 const colors = {
   bg: "#F7F5F0",
@@ -39,6 +41,7 @@ export default function NewClassPage() {
         setError(data.error ?? "Something went wrong.");
         return;
       }
+      toast("Class created. Share the join code with your students.");
       router.push("/classes");
     } finally {
       setLoading(false);
@@ -48,9 +51,9 @@ export default function NewClassPage() {
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
         display: "flex",
@@ -129,7 +132,7 @@ export default function NewClassPage() {
             alignSelf: "flex-start",
           }}
         >
-          {loading ? "Creating..." : "Create class"}
+          {loading && <Spinner />} {loading ? "Creating…" : "Create class"}
         </button>
       </form>
     </main>

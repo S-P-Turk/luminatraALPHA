@@ -16,6 +16,10 @@
       "model": "Enrollment",
       "namespace": "public"
     },
+    "Student": {
+      "model": "Student",
+      "namespace": "public"
+    },
     "Submission": {
       "model": "Submission",
       "namespace": "public"
@@ -372,6 +376,70 @@
               "table": "Enrollment"
             }
           },
+          "Student": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "precision": 3
+                  }
+                }
+              },
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "passwordHash": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "passwordHash": {
+                  "column": "passwordHash"
+                }
+              },
+              "namespaceId": "public",
+              "table": "Student"
+            }
+          },
           "Submission": {
             "fields": {
               "assignmentId": {
@@ -587,6 +655,13 @@
                   "codecId": "pg/int4@1",
                   "kind": "scalar"
                 }
+              },
+              "passwordHash": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
               }
             },
             "relations": {
@@ -616,6 +691,9 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "passwordHash": {
+                  "column": "passwordHash"
                 }
               },
               "namespaceId": "public",
@@ -907,6 +985,60 @@
                 }
               ]
             },
+            "Student": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-date@1",
+                  "dataType": "pg/timestamptz",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nullable": false,
+                  "typeParams": {
+                    "precision": 3
+                  }
+                },
+                "email": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/int4@1",
+                  "dataType": "pg/int4",
+                  "default": {
+                    "expression": "autoincrement()",
+                    "kind": "function"
+                  },
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": false
+                },
+                "passwordHash": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "email"
+                  ]
+                }
+              ]
+            },
             "Submission": {
               "columns": {
                 "assignmentId": {
@@ -1097,6 +1229,11 @@
                     "kind": "function"
                   },
                   "nullable": false
+                },
+                "passwordHash": {
+                  "codecId": "pg/text@1",
+                  "dataType": "pg/text",
+                  "nullable": true
                 }
               },
               "foreignKeys": [],
@@ -1120,10 +1257,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "97e12b76673fc1949c83384bb872386acb5bbe0958c67dcd99a47ef6b38ccf92"
+    "storageHash": "ed4afe96d9bab0265c7ca45832b452dee79c4127c137e5976c1457acb80b0452"
   },
   "execution": {
-    "executionHash": "d64c2479453df4139d4052f82d7bf48ec1e8e8e4cfc5f4156a06169ff7f744ca",
+    "executionHash": "cff0b653a1094785d10d2a8e0d8127b5765e4fcd2f4811b2178f076964d0c39c",
     "mutations": {
       "defaults": [
         {
@@ -1164,6 +1301,20 @@
           },
           "ref": {
             "entry": "Enrollment",
+            "field": "createdAt",
+            "namespace": "public"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator",
+            "params": {
+              "precision": 3
+            }
+          },
+          "ref": {
+            "entry": "Student",
             "field": "createdAt",
             "namespace": "public"
           }

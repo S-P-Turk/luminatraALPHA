@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner, WorkingNote } from "@/src/components/Spinner";
+import { toast } from "@/src/components/Toaster";
 
 type QuizQuestion = {
   question: string;
@@ -113,6 +115,7 @@ export default function StudentAssignmentClient() {
       }
       // Reload so the quiz stays hidden unless the teacher has activated it.
       await load();
+      toast("Submitted. Your teacher will start the quiz when they're ready.");
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +137,7 @@ export default function StudentAssignmentClient() {
         return;
       }
       setDetail((d) => (d ? { ...d, submission: data.submission } : d));
+      toast("Answers submitted.");
     } finally {
       setSavingAnswers(false);
     }
@@ -155,6 +159,7 @@ export default function StudentAssignmentClient() {
         return;
       }
       setDetail((d) => (d ? { ...d, submission: data.submission } : d));
+      toast("Response sent to your teacher.");
     } finally {
       setSavingResponse(false);
     }
@@ -162,8 +167,9 @@ export default function StudentAssignmentClient() {
 
   if (!detail && !error) {
     return (
-      <main style={{ minHeight: "100vh", background: colors.bg, padding: 48 }}>
-        <div style={{ color: colors.muted, fontFamily: "Inter, sans-serif" }}>Loading...</div>
+      <main style={{ minHeight: "calc(100vh - 57px)", background: colors.bg, padding: 48 }}>
+        <div style={{ color: colors.muted, fontFamily: "var(--font-sans), sans-serif", display: "flex", gap: 8, alignItems: "center" }}>
+          <Spinner />Loading...</div>
       </main>
     );
   }
@@ -173,9 +179,9 @@ export default function StudentAssignmentClient() {
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
       }}
@@ -198,7 +204,7 @@ export default function StudentAssignmentClient() {
               marginTop: 10,
             }}
           >
-            Luminatra
+            Student · Assignment
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>{detail?.assignment.title}</h1>
           {detail?.assignment.instructions && (
@@ -263,6 +269,7 @@ export default function StudentAssignmentClient() {
                 style={inputStyle}
               />
             </div>
+            {submitting && <WorkingNote message="Analyzing your submission…" hint="This usually takes 20–40 seconds. Keep this page open." />}
             <button
               type="submit"
               disabled={submitting}
@@ -279,7 +286,7 @@ export default function StudentAssignmentClient() {
                 alignSelf: "flex-start",
               }}
             >
-              {submitting ? "Submitting..." : "Submit"}
+              {submitting && <Spinner />} {submitting ? "Submitting…" : "Submit"}
             </button>
           </form>
         )}
@@ -344,6 +351,7 @@ export default function StudentAssignmentClient() {
                 />
               </div>
             ))}
+            {savingAnswers && <WorkingNote message="Checking your answers…" hint="About 10–20 seconds." />}
             <button
               type="submit"
               disabled={savingAnswers}
@@ -360,7 +368,7 @@ export default function StudentAssignmentClient() {
                 alignSelf: "flex-start",
               }}
             >
-              {savingAnswers ? "Saving..." : "Submit answers"}
+              {savingAnswers && <Spinner />} {savingAnswers ? "Saving…" : "Submit answers"}
             </button>
           </form>
           ))
@@ -420,7 +428,7 @@ export default function StudentAssignmentClient() {
                 alignSelf: "flex-start",
               }}
             >
-              {savingResponse ? "Saving..." : "Send response"}
+              {savingResponse && <Spinner />} {savingResponse ? "Saving…" : "Send response"}
             </button>
           </form>
         )}

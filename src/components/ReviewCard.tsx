@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ScoreCard } from "@/src/lib/scoring";
+import { toast } from "./Toaster";
 
 export const SIGNAL_LABELS = {
   textMatch: "AI text in submission",
@@ -105,7 +106,12 @@ export function ReviewCard({
     setBusy(true);
     const status = await decideSubmission(s, next);
     setBusy(false);
-    if (status) onCleared(s.id, status);
+    if (status) {
+      onCleared(s.id, status);
+      toast(next === "cleared" ? `${s.studentName}: marked cleared.` : `${s.studentName}: marked for follow-up.`);
+    } else {
+      toast("Couldn't save that decision. Try again.", "error");
+    }
   }
 
   return (

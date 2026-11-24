@@ -1,16 +1,17 @@
 import { cookies } from "next/headers";
+import { readSession } from "./session";
 
 export const TEACHER_COOKIE = "teacher_email";
 
 /**
- * Prototype-only auth: no passwords, no magic links. Whoever controls the
- * cookie is "logged in" as that email. Good enough for Hour 1-6 of the
- * prototype; replace with real auth (magic link / SSO) before this touches
- * real students or teachers.
+ * The signed-in teacher's email, from a signed session cookie. Cookies from
+ * before passwords existed (plain emails) fail verification, so those
+ * teachers simply sign in again.
  */
 export async function getCurrentTeacherEmail(): Promise<string | null> {
   const store = await cookies();
-  return store.get(TEACHER_COOKIE)?.value ?? null;
+  const session = readSession<{ role?: string; email?: string }>(store.get(TEACHER_COOKIE)?.value);
+  return session?.role === "teacher" && typeof session.email === "string" ? session.email : null;
 }
 
 export function isValidEmail(email: string): boolean {

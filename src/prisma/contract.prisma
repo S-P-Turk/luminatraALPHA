@@ -1,9 +1,12 @@
 // use prisma-8
 
 model Teacher {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  classes   Class[]
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  // Null until the teacher creates a password (accounts that existed before
+  // passwords do this at their next sign-in).
+  passwordHash String?
+  classes      Class[]
   createdAt DateTime @default(now()) @onCreate(now())
 }
 
@@ -78,4 +81,16 @@ model Submission {
   updatedAt       temporal.UpdatedAt
 
   @@unique([assignmentId, studentEmail])
+}
+
+// A student account. Class membership still lives in Enrollment (keyed by
+// email); this row only holds identity and credentials. Students who used the
+// app before accounts existed get a row the first time they sign in again.
+model Student {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String
+  // Null until set, and reset to null when a teacher resets it.
+  passwordHash String?
+  createdAt    DateTime @default(now()) @onCreate(now())
 }

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ClassRoster } from "@/src/components/ClassRoster";
+import { toast } from "@/src/components/Toaster";
+import { Spinner, WorkingNote } from "@/src/components/Spinner";
 
 type Assignment = {
   id: number;
@@ -80,6 +83,7 @@ export default function AssignmentsClient() {
       setTitle("");
       setInstructions("");
       setAssignments((prev) => (prev ? [data.assignment, ...prev] : [data.assignment]));
+      toast("Assignment created. Open it when students should start submitting.");
     } finally {
       setCreating(false);
     }
@@ -128,6 +132,7 @@ export default function AssignmentsClient() {
         return;
       }
       setAssignments((prev) => (prev ? [data.assignment, ...prev] : [data.assignment]));
+      toast("Suggested assignment added. Open it when students should start submitting.");
       dismissSuggestion(index);
     } finally {
       setAddingIndex(null);
@@ -146,6 +151,11 @@ export default function AssignmentsClient() {
         const data = await res.json();
         setAssignments((prev) =>
           prev ? prev.map((x) => (x.id === a.id ? { ...x, quizOpen: data.assignment.quizOpen } : x)) : prev
+        );
+        toast(
+          data.assignment.quizOpen
+            ? `Quiz activated — students can take it now.`
+            : `Quiz stopped. Students won't see it until you activate it again.`
         );
       }
     } finally {
@@ -166,6 +176,7 @@ export default function AssignmentsClient() {
         setAssignments((prev) =>
           prev ? prev.map((x) => (x.id === a.id ? { ...x, open: data.assignment.open } : x)) : prev
         );
+        toast(data.assignment.open ? `"${a.title}" is open for submissions.` : `"${a.title}" is closed.`);
       }
     } finally {
       setTogglingId(null);
@@ -175,9 +186,9 @@ export default function AssignmentsClient() {
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
       }}
@@ -197,7 +208,7 @@ export default function AssignmentsClient() {
               marginTop: 10,
             }}
           >
-            Luminatra
+            Teacher · Assignments
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>
             {className ? `${className} — assignments` : "Assignments"}
@@ -227,6 +238,7 @@ export default function AssignmentsClient() {
                 Pulled from this class&apos;s syllabus — review and edit before adding any of them.
               </p>
             </div>
+            {suggesting && <WorkingNote message="Reading your syllabus…" hint="Drafting assignment ideas takes about 15–30 seconds." />}
             <button
               onClick={handleSuggest}
               disabled={suggesting}
@@ -243,7 +255,7 @@ export default function AssignmentsClient() {
                 whiteSpace: "nowrap",
               }}
             >
-              {suggesting ? "Reading syllabus..." : suggestions ? "Suggest again" : "Suggest from syllabus"}
+              {suggesting && <Spinner />} {suggesting ? "Reading syllabus…" : suggestions ? "Suggest again" : "Suggest from syllabus"}
             </button>
           </div>
 
@@ -309,7 +321,7 @@ export default function AssignmentsClient() {
                         opacity: addingIndex === i ? 0.6 : 1,
                       }}
                     >
-                      {addingIndex === i ? "Adding..." : "Add this assignment"}
+                      {addingIndex === i && <Spinner />} {addingIndex === i ? "Adding…" : "Add this assignment"}
                     </button>
                     <button
                       onClick={() => dismissSuggestion(i)}
@@ -393,12 +405,12 @@ export default function AssignmentsClient() {
               alignSelf: "flex-start",
             }}
           >
-            {creating ? "Creating..." : "Create assignment"}
+            {creating && <Spinner />} {creating ? "Creating…" : "Create assignment"}
           </button>
         </form>
 
         {assignments === null && !error && (
-          <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>
+          <div style={{ color: colors.muted, fontSize: 14 }}><Spinner /> Loading…</div>
         )}
 
         {assignments?.length === 0 && (
@@ -491,6 +503,8 @@ export default function AssignmentsClient() {
             </div>
           ))}
         </div>
+
+        <ClassRoster classId={params.id} />
       </div>
     </main>
   );

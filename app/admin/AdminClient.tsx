@@ -97,9 +97,9 @@ export default function AdminClient() {
   const shell = (children: React.ReactNode) => (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "40px 20px 80px",
       }}
@@ -115,7 +115,7 @@ export default function AdminClient() {
               color: colors.accent,
             }}
           >
-            Luminatra · Admin
+            Admin
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Model test set</h1>
         </div>

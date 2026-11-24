@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ReviewCard, colors, scoreOf, type ReviewSubmission } from "./ReviewCard";
+import { WorkingNote } from "./Spinner";
 
 export function ReviewList({
   title,
@@ -29,9 +30,9 @@ export function ReviewList({
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
       }}
@@ -51,13 +52,18 @@ export function ReviewList({
               marginTop: 10,
             }}
           >
-            Luminatra
+            Teacher · Review
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>{title}</h1>
         </div>
 
         {error && <div style={{ color: colors.amber, fontSize: 14 }}>{error}</div>}
-        {submissions === null && !error && <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>}
+        {submissions === null && !error && (
+          <WorkingNote
+            message="Loading submissions…"
+            hint="Newly answered quizzes are checked as the page loads, so this can take a few seconds."
+          />
+        )}
 
         {submissions?.length === 0 && (
           <div

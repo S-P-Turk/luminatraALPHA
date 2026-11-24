@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/src/components/Spinner";
 
 type ClassRow = {
   id: number;
@@ -93,17 +94,13 @@ export default function ClassesPage() {
     }
   }
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-  }
 
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
       }}
@@ -120,7 +117,7 @@ export default function ClassesPage() {
                 color: colors.accent,
               }}
             >
-              Luminatra
+              Teacher
             </div>
             <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Your classes</h1>
           </div>
@@ -155,28 +152,13 @@ export default function ClassesPage() {
             >
               + New class
             </Link>
-            <button
-              onClick={handleLogout}
-              style={{
-                background: "#fff",
-                color: colors.ink,
-                border: `1px solid ${colors.cardBorder}`,
-                borderRadius: 8,
-                padding: "9px 16px",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Sign out
-            </button>
           </div>
         </div>
 
         {error && <div style={{ color: "#B8822F", fontSize: 14 }}>{error}</div>}
 
         {classes === null && !error && (
-          <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>
+          <div style={{ color: colors.muted, fontSize: 14 }}><Spinner /> Loading…</div>
         )}
 
         {classes?.length === 0 && (

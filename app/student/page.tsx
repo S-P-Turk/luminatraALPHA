@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/src/components/Spinner";
+import { toast } from "@/src/components/Toaster";
 
 type ClassSummary = {
   id: number;
@@ -86,22 +88,19 @@ export default function StudentHomePage() {
       }
       setJoinCode("");
       await load();
+      toast(data.class?.name ? `Joined ${data.class.name}.` : "Joined the class.");
     } finally {
       setJoining(false);
     }
   }
 
-  async function handleLeave() {
-    await fetch("/api/auth/student-logout", { method: "POST" });
-    router.push("/");
-  }
 
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
       }}
@@ -118,25 +117,11 @@ export default function StudentHomePage() {
                 color: colors.accent,
               }}
             >
-              Luminatra
+              Student
             </div>
             <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Your classes</h1>
             {name && <p style={{ margin: "2px 0 0", fontSize: 13, color: colors.muted }}>Signed in as {name}</p>}
           </div>
-          <button
-            onClick={handleLeave}
-            style={{
-              background: "#fff",
-              border: `1px solid ${colors.cardBorder}`,
-              borderRadius: 8,
-              padding: "9px 16px",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Not you? Switch student
-          </button>
         </div>
 
         <form
@@ -183,7 +168,7 @@ export default function StudentHomePage() {
               opacity: joining || !joinCode ? 0.6 : 1,
             }}
           >
-            {joining ? "Joining..." : "Join"}
+            {joining && <Spinner />} {joining ? "Joining…" : "Join"}
           </button>
           {joinError && <div style={{ width: "100%", fontSize: 13, color: colors.amber }}>{joinError}</div>}
         </form>
@@ -191,7 +176,7 @@ export default function StudentHomePage() {
         {error && <div style={{ color: colors.amber, fontSize: 14 }}>{error}</div>}
 
         {classes === null && !error && (
-          <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>
+          <div style={{ color: colors.muted, fontSize: 14 }}><Spinner /> Loading…</div>
         )}
 
         {classes?.length === 0 && (

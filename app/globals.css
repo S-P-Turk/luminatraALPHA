@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
+/* Luminatra design tokens — warm paper, ink, and a single amber-brown accent. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --lum-bg: #f7f5f0;
+  --lum-surface: #ffffff;
+  --lum-ink: #1e2230;
+  --lum-muted: #6b7080;
+  --lum-accent: #8a5a3b;
+  --lum-border: #e7e2d8;
+  --lum-border-strong: #d8d3c6;
+  --lum-green: #3f7a5e;
+  --lum-amber: #b8822f;
+  --lum-amber-bg: #fbf0da;
+  --lum-focus: #8a5a3b55;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--lum-bg);
+  --color-foreground: var(--lum-ink);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html,
+body {
+  background: var(--lum-bg);
+  color: var(--lum-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-family: var(--font-serif), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+h1 {
+  font-weight: 600 !important;
+}
+
+::selection {
+  background: var(--lum-amber-bg);
+}
+
+/* Buttons, links and inputs: consistent feel everywhere, even where pages
+   set their own inline colors. */
+button,
+a {
+  transition:
+    filter 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+button:not(:disabled):hover {
+  filter: brightness(0.94);
+}
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+button:disabled {
+  cursor: default !important;
+  opacity: 0.6;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--lum-focus);
+}
+input,
+textarea,
+select {
+  font-family: inherit;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--lum-accent) !important;
+}
+
+/* Cards (most pages use white boxes with a border) get a soft lift. */
+main div[style*="background: rgb(255, 255, 255)"][style*="border-radius"] {
+  box-shadow: 0 1px 2px #1e22300a;
+}
+
+@keyframes lum-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes lum-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes lum-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (max-width: 560px) {
+  .lum-hide-sm {
+    display: none;
+  }
 }

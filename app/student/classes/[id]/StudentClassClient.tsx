@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/src/components/Spinner";
 
 type AssignmentRow = {
   id: number;
@@ -87,9 +88,9 @@ export default function StudentClassClient() {
   return (
     <main
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 57px)",
         background: colors.bg,
-        fontFamily: "Inter, system-ui, sans-serif",
+        fontFamily: "var(--font-sans), system-ui, sans-serif",
         color: colors.ink,
         padding: "48px 32px 80px",
       }}
@@ -109,7 +110,7 @@ export default function StudentClassClient() {
               marginTop: 10,
             }}
           >
-            Luminatra
+            Student · Class
           </div>
           <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>{className}</h1>
         </div>
@@ -117,7 +118,7 @@ export default function StudentClassClient() {
         {error && <div style={{ color: colors.amber, fontSize: 14 }}>{error}</div>}
 
         {assignments === null && !error && (
-          <div style={{ color: colors.muted, fontSize: 14 }}>Loading...</div>
+          <div style={{ color: colors.muted, fontSize: 14 }}><Spinner /> Loading…</div>
         )}
 
         {assignments?.length === 0 && (
