@@ -5,6 +5,7 @@ import { STUDENT_COOKIE } from "@/src/lib/student-auth";
 import { isValidEmail } from "@/src/lib/auth";
 import { hashPassword, passwordProblem, verifyPassword } from "@/src/lib/password";
 import { signSession, SESSION_COOKIE_OPTIONS } from "@/src/lib/session";
+import { isTeacherEmail, WRONG_ROLE } from "@/src/lib/roles";
 
 // Student sign-in with email + password. Joining a class is a separate step
 // (POST /api/student/join). New students give their name; students from
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
+  const creating = body?.creating === true;
   const givenName = typeof body?.name === "string" ? body.name.trim() : "";
   if (!isValidEmail(email)) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
 
@@ -20,6 +22,7 @@ export async function POST(request: Request) {
 
   if (student?.passwordHash) {
     if (!(await verifyPassword(password, student.passwordHash))) {
+      if (creating) return NextResponse.json({ error: "This account already has a password. Go back and sign in with it, or ask for a reset if you've forgotten it." }, { status: 409 });
       return NextResponse.json({ error: "That password isn't right." }, { status: 401 });
     }
   } else {
@@ -34,6 +37,9 @@ export async function POST(request: Request) {
         .orderBy((e) => e.createdAt.desc())
         .select("studentName")
         .first();
+      if (!prior && (await isTeacherEmail(email))) {
+        return NextResponse.json({ error: WRONG_ROLE.student }, { status: 409 });
+      }
       const name = prior?.studentName ?? givenName;
       if (!name) return NextResponse.json({ error: "Enter your name." }, { status: 400 });
       try {

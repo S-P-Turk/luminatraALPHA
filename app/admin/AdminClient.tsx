@@ -19,6 +19,29 @@ export default function AdminClient() {
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  async function resetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setResetting(true);
+    try {
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error ?? "Couldn't reset that account.", "error");
+        return;
+      }
+      toast(`${resetEmail}: ${(data.done as string[]).join("; ")}. They'll create a new password at next sign-in.`);
+      setResetEmail("");
+    } finally {
+      setResetting(false);
+    }
+  }
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/eval");
@@ -161,7 +184,7 @@ export default function AdminClient() {
           >
             Admin
           </div>
-          <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Model test set</h1>
+          <h1 style={{ margin: "4px 0 0", fontSize: 26, fontWeight: 600 }}>Admin</h1>
         </div>
         {children}
       </div>
@@ -214,6 +237,54 @@ export default function AdminClient() {
 
   return shell(
     <>
+      <form
+        onSubmit={resetPassword}
+        style={{
+          background: "#fff",
+          border: `1px solid ${colors.border}`,
+          borderRadius: 10,
+          padding: 16,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "flex-end",
+          gap: 10,
+        }}
+      >
+        <div style={{ flex: "1 1 260px" }}>
+          <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>
+            Reset a password (any teacher or student)
+          </label>
+          <input
+            type="email"
+            required
+            placeholder="email@school.edu"
+            value={resetEmail}
+            onChange={(e) => setResetEmail(e.target.value)}
+            style={{ width: "100%", padding: "9px 12px", border: `1px solid ${colors.cardBorder}`, borderRadius: 8, fontSize: 14 }}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={resetting}
+          style={{
+            background: colors.ink,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            padding: "10px 16px",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          {resetting ? "Resetting…" : "Reset password"}
+        </button>
+        <div style={{ width: "100%", fontSize: 12, color: colors.muted }}>
+          They create a new password the next time they sign in. If a student&apos;s email was accidentally made into
+          an empty teacher account, this removes it.
+        </div>
+      </form>
+
       <div
         style={{
           background: "#fff",

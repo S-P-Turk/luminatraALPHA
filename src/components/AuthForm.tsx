@@ -6,6 +6,7 @@ import { Spinner } from "./Spinner";
 
 type Role = "teacher" | "student";
 type Step = "email" | "sign_in" | "set_password" | "new";
+const OTHER_LOGIN = { teacher: "/student/login", student: "/login" } as const;
 
 const input: React.CSSProperties = {
   width: "100%",
@@ -30,6 +31,7 @@ export function AuthForm({ role }: { role: Role }) {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [wrongRole, setWrongRole] = useState<string | null>(null);
 
   // Next.js keeps recently visited pages alive in the background (React
   // Activity), so without this the form would come back on its old step
@@ -45,6 +47,7 @@ export function AuthForm({ role }: { role: Role }) {
       setShow(false);
       setError(null);
       setLoading(false);
+      setWrongRole(null);
     };
   }, []);
 
@@ -53,6 +56,7 @@ export function AuthForm({ role }: { role: Role }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setWrongRole(null);
 
     if (step === "email") {
       setLoading(true);
@@ -64,6 +68,10 @@ export function AuthForm({ role }: { role: Role }) {
         });
         const data = await res.json();
         if (!res.ok) return setError(data.error ?? "Something went wrong.");
+        if (data.next === "wrong_role") {
+          setWrongRole(data.message ?? "This email belongs to the other sign-in.");
+          return;
+        }
         setStep(data.next);
       } catch {
         setError("Couldn't reach the server. Check your connection and try again.");
@@ -82,7 +90,7 @@ export function AuthForm({ role }: { role: Role }) {
       const res = await fetch(role === "teacher" ? "/api/auth/login" : "/api/auth/student-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, creating }),
       });
       const data = await res.json();
       if (!res.ok) return setError(data.error ?? "Something went wrong.");
@@ -252,6 +260,28 @@ export function AuthForm({ role }: { role: Role }) {
               </div>
             )}
           </>
+        )}
+
+        {wrongRole && (
+          <div
+            role="alert"
+            style={{
+              fontSize: 14,
+              color: "var(--lum-ink)",
+              background: "var(--lum-amber-bg)",
+              border: "1px solid #ecd9b4",
+              borderRadius: 8,
+              padding: "10px 12px",
+            }}
+          >
+            {wrongRole}{" "}
+            <a
+              href={`${OTHER_LOGIN[role]}`}
+              style={{ color: "var(--lum-accent)", fontWeight: 700, whiteSpace: "nowrap" }}
+            >
+              {role === "teacher" ? "Go to student sign-in →" : "Go to teacher sign-in →"}
+            </a>
+          </div>
         )}
 
         {error && (
