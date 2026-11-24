@@ -1,5 +1,6 @@
 import { db } from "@/src/prisma/db";
 import { gradeAnswers, type QuizResult, type ComprehensionResult } from "@/src/lib/quiz";
+import { withAiContext } from "@/src/lib/ai";
 import { scoreSubmission, SCORING_VERSION, type ScoreCard } from "@/src/lib/scoring";
 
 // Stored in Submission.reportCard.
@@ -14,6 +15,7 @@ export const TEACHER_DECISIONS = ["cleared", "follow_up"] as const;
 
 type Row = {
   id: number;
+  classId?: number;
   assignmentText: string;
   transcript: string;
   quiz: unknown;
@@ -48,12 +50,14 @@ export async function gradeIfNeeded(row: Row): Promise<{ reportCard: unknown; st
 
   if (!comprehension && Array.isArray(row.quizAnswers)) {
     try {
-      comprehension = await gradeAnswers({
-        assignmentText: row.assignmentText,
-        transcript: row.transcript,
-        quiz: row.quiz as QuizResult,
-        answers: row.quizAnswers as string[],
-      });
+      comprehension = await withAiContext({ classId: row.classId ?? null }, () =>
+        gradeAnswers({
+          assignmentText: row.assignmentText,
+          transcript: row.transcript,
+          quiz: row.quiz as QuizResult,
+          answers: row.quizAnswers as string[],
+        })
+      );
       newlyGraded = true;
     } catch {
       // leave ungraded; retried next load

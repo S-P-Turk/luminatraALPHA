@@ -1,12 +1,12 @@
 import { Suspense } from "react";
-import AdminClient from "./AdminClient";
+import OverviewClient from "./OverviewClient";
 
 export const instant = false;
 
-export default function AdminPage() {
+export default function AdminOverviewPage() {
   return (
     <Suspense fallback={null}>
-      <AdminClient />
+      <OverviewClient />
     </Suspense>
   );
 }

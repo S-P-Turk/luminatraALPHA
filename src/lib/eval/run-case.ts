@@ -2,7 +2,7 @@
 // student answering the quiz -> grader -> scoring layer. Shared by the CLI
 // (scripts/eval/run.ts) and the admin "Run test set" button.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { callClaude, withAiContext } from "../ai";
 import { generateQuiz, gradeAnswers, type QuizResult } from "../quiz";
 import { scoreSubmission, type ScoreCard } from "../scoring";
 import type { EvalCase } from "./cases";
@@ -12,10 +12,13 @@ const VAGUE = [
   "It talks about why it was important and what happened because of it, I don't remember the details exactly.",
 ];
 
-async function simulateAnswers(c: EvalCase, quiz: QuizResult): Promise<string[]> {
-  if (c.student === "vague") return quiz.quiz.map((_, i) => VAGUE[i] ?? VAGUE[0]);
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const msg = await anthropic.messages.create({
+export async function simulateAnswers(
+  submission: string,
+  quiz: QuizResult,
+  student: "knows_work" | "vague"
+): Promise<string[]> {
+  if (student === "vague") return quiz.quiz.map((_, i) => VAGUE[i] ?? VAGUE[0]);
+  const msg = await callClaude("eval", {
     model: "claude-sonnet-5",
     max_tokens: 600,
     system:
@@ -23,7 +26,7 @@ async function simulateAnswers(c: EvalCase, quiz: QuizResult): Promise<string[]>
     messages: [
       {
         role: "user",
-        content: `YOUR SUBMITTED WORK:\n${c.submission}\n\nQUESTIONS:\n${quiz.quiz.map((q) => q.question).join("\n")}`,
+        content: `YOUR SUBMITTED WORK:\n${submission}\n\nQUESTIONS:\n${quiz.quiz.map((q) => q.question).join("\n")}`,
       },
     ],
   });
@@ -43,15 +46,23 @@ export type CaseResult = {
   relianceExpected: EvalCase["expectReliance"] | null;
   relianceActual: "none" | "ideas" | "heavy" | "written";
   relianceCorrect: boolean | null; // null when the case has no reliance answer key
+  costUsd?: number;
   card: ScoreCard;
   quiz: QuizResult;
   answers: string[];
 };
 
+/** runCase with its Claude calls tagged as test-set spend and costed. */
+export async function runCaseTracked(c: EvalCase): Promise<CaseResult> {
+  const tally = { costUsd: 0, calls: 0 };
+  const r = await withAiContext({ step: "eval", tally }, () => runCase(c));
+  return { ...r, costUsd: tally.costUsd };
+}
+
 export async function runCase(c: EvalCase): Promise<CaseResult> {
   const policy = `COURSE SYLLABUS / AI-USE POLICY:\n${c.syllabus}\n\n---\n\nTHIS ASSIGNMENT'S INSTRUCTIONS:\n${c.instructions}`;
   const quiz = await generateQuiz(c.transcript, policy, c.submission);
-  const answers = await simulateAnswers(c, quiz);
+  const answers = await simulateAnswers(c.submission, quiz, c.student);
   const comprehension = await gradeAnswers({ assignmentText: c.submission, transcript: c.transcript, quiz, answers });
   const card = scoreSubmission({ quiz, submissionText: c.submission, transcript: c.transcript, comprehension });
   const actual = card.needsReview ? "review" : "no_review";

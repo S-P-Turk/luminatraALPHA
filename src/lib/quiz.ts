@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
+import { callClaude } from "./ai";
 import { numberedParagraphs } from "./paragraphs";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Kept identical in spirit to the original app/api/generate-quiz prototype
 // prompt — pulled out here so the real student-submission flow and the
@@ -161,7 +161,7 @@ export async function generateQuiz(transcript: string, syllabus: string, submiss
     throw new Error("Server is missing ANTHROPIC_API_KEY.");
   }
 
-  const message = await anthropic.messages.create({
+  const message = await callClaude("analysis", {
     model: "claude-sonnet-5",
     max_tokens: 4096,
     system: SYSTEM_PROMPT,
@@ -246,7 +246,7 @@ export async function gradeAnswers(input: {
     .map((q, i) => `Q${i + 1}: ${q.question}\n(tests: ${q.what_it_tests})\nA${i + 1}: ${input.answers[i] ?? ""}`)
     .join("\n\n");
 
-  const message = await anthropic.messages.create({
+  const message = await callClaude("grading", {
     model: "claude-sonnet-5",
     max_tokens: 1024,
     system: GRADE_SYSTEM_PROMPT,

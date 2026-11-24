@@ -81,6 +81,9 @@ export function AppHeader() {
     window.location.assign(area === "student" ? "/student/login" : "/login");
   }
 
+  // The admin area has its own sidebar and look.
+  if (area === "admin") return null;
+
   const home = area === "student" && session?.student ? "/student" : area === "teacher" && session?.teacher ? "/classes" : "/";
   const who = area === "student" ? session?.student?.name : area === "teacher" ? session?.teacher : null;
 
@@ -121,7 +124,6 @@ export function AppHeader() {
             {area === "student" && session?.student && (
               <NavLink href="/student" label="My classes" active={pathname === "/student" || pathname.startsWith("/student/classes")} />
             )}
-            {area === "admin" && <NavLink href="/admin" label="Admin" active />}
           </nav>
         </div>
 

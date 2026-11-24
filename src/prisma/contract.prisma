@@ -94,3 +94,59 @@ model Student {
   passwordHash String?
   createdAt    DateTime @default(now()) @onCreate(now())
 }
+
+// One row per Claude API call, for the admin spending page and the budget
+// hard stop. costUsd is estimated from token counts (see src/lib/ai.ts).
+model ApiCall {
+  id           Int      @id @default(autoincrement())
+  // "analysis" | "grading" | "suggestions" | "lab" | "eval"
+  step         String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+  durationMs   Int
+  ok           Boolean
+  classId      Int?
+  createdAt    DateTime @default(now()) @onCreate(now())
+
+  @@index([createdAt])
+}
+
+// Admin settings as key/value (monthly budget, alert threshold, hard stop).
+model AdminSetting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
+
+// A completed test-set run, for the model-quality history.
+model EvalRun {
+  id              Int      @id @default(autoincrement())
+  version         String
+  total           Int
+  judged          Int
+  correct         Int
+  relianceJudged  Int
+  relianceCorrect Int
+  borderline      Int
+  errors          Int
+  costUsd         Float
+  detail          Json?
+  createdAt       DateTime @default(now()) @onCreate(now())
+}
+
+// Test cases saved from the admin test lab; they join the built-in test set.
+model LabCase {
+  id             Int      @id @default(autoincrement())
+  name           String
+  syllabus       String
+  transcript     String
+  submission     String
+  // "knows_work" | "vague"
+  student        String
+  // "review" | "no_review" | "either"
+  expect         String
+  expectReliance String?
+  createdAt      DateTime @default(now()) @onCreate(now())
+}

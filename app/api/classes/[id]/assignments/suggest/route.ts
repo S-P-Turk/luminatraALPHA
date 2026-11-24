@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
+import { withAiContext } from "@/src/lib/ai";
 import { generateAssignmentSuggestions } from "@/src/lib/assignment-suggestions";
 
 // Reads this class's syllabus and proposes assignments (title + what it
@@ -25,7 +26,7 @@ export async function POST(_request: Request, ctx: RouteContext<"/api/classes/[i
   }
 
   try {
-    const suggestions = await generateAssignmentSuggestions(cls.syllabusText);
+    const suggestions = await withAiContext({ classId: cls.id }, () => generateAssignmentSuggestions(cls.syllabusText));
     return NextResponse.json({ suggestions });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not generate suggestions.";

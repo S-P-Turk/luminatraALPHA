@@ -34,3 +34,9 @@ export async function isAdmin(): Promise<boolean> {
   const got = store.get(ADMIN_COOKIE)?.value;
   return Boolean(got) && safeEqual(got!, tokenFor(real));
 }
+
+/** For admin API routes: a 401 response when not signed in as admin. */
+export async function requireAdmin(): Promise<Response | null> {
+  if (await isAdmin()) return null;
+  return Response.json({ error: "Admin only." }, { status: 401 });
+}

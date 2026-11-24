@@ -3,6 +3,7 @@ import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { generateQuiz } from "@/src/lib/quiz";
 import { scoreSubmission } from "@/src/lib/scoring";
+import { withAiContext } from "@/src/lib/ai";
 import { nextStatus, forStudent } from "@/src/lib/grading";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/submit">) {
@@ -78,7 +79,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
 
   let quiz;
   try {
-    quiz = await generateQuiz(transcript, combinedPolicy, assignmentText);
+    quiz = await withAiContext({ classId: assignment.classId }, () =>
+      generateQuiz(transcript, combinedPolicy, assignmentText)
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Could not generate your quiz.";
     return NextResponse.json({ error: msg }, { status: 502 });

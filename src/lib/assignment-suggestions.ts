@@ -1,6 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
+import { callClaude } from "./ai";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const SYSTEM_PROMPT = `You help a professor turn their course syllabus into a short list of concrete assignments they can post to students.
 
@@ -49,7 +49,7 @@ export async function generateAssignmentSuggestions(syllabusText: string): Promi
     throw new Error("Server is missing ANTHROPIC_API_KEY.");
   }
 
-  const message = await anthropic.messages.create({
+  const message = await callClaude("suggestions", {
     model: "claude-sonnet-5",
     max_tokens: 1536,
     system: SYSTEM_PROMPT,
