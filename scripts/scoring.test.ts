@@ -122,6 +122,17 @@ t("citing the student's own message as the 'AI source' is rejected", () => {
   assert.equal(c.reliance.paragraphs[0].level, "none");
 });
 
+t("a real AI reply that's unrelated to the paragraph can't label it", () => {
+  const brainstorm = "Possible angles: the war-guilt clause, territorial losses, or the weakness of the League of Nations.";
+  const c = scoreSubmission({
+    quiz: { ...base, paragraphs: [rate(1, "ideas", { ai_source_excerpt: brainstorm })] },
+    submissionText: own,
+    transcript: `User: angles?\nAssistant: ${brainstorm}`,
+  });
+  assert.equal(c.reliance.paragraphs[0].level, "none");
+  assert.equal(c.reliance.rejected, 1);
+});
+
 t("disclosed reliance is shown but scores 0", () => {
   const c = scoreSubmission({
     quiz: { ...base, ai_passages: [copied({ claimed_as_own: false })], paragraphs: [rate(1, "none"), rate(2, "written", { disclosed: true })] },

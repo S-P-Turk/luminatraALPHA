@@ -56,6 +56,33 @@ function sourceVerified(excerpt: string, aiGrams: Set<string>): boolean {
   return own.size > 0 && hit / own.size >= 0.8;
 }
 
+// Light stemming so "signed"/"signing" or "damage"/"damaged" still match.
+const STOP = new Set(
+  "about after also because been being both could does doing from have having into just more most much only other over said same should some such than that their them then there these they this those through very what when where which while will with would your".split(" ")
+);
+function stems(text: string): Set<string> {
+  return new Set(
+    tokenize(text)
+      .map((t) => t.word.replace(/'s$/, ""))
+      .filter((w) => w.length > 3 && !STOP.has(w))
+      .map((w) => w.slice(0, 5))
+  );
+}
+
+/**
+ * The cited AI reply must actually relate to the paragraph: at least 3
+ * shared content words, or 20% of the reply's content words. Otherwise a
+ * real-but-unrelated AI reply (e.g. a brainstorm list) could be used to
+ * label an honest paragraph as AI-dependent.
+ */
+export function relatedToParagraph(source: string, paragraph: string): boolean {
+  const a = stems(source);
+  const b = stems(paragraph);
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared++;
+  return shared >= 3 || (a.size > 0 && shared / a.size >= 0.2);
+}
+
 const maxLevel = (a: RelianceLevel, b: RelianceLevel) => (RANK[a] >= RANK[b] ? a : b);
 
 export function computeReliance(input: {
@@ -96,7 +123,10 @@ export function computeReliance(input: {
     let evidence: ParagraphResult["evidence"] = "none";
 
     if (rating && rating.reliance !== "none") {
-      const verified = rating.ai_source_excerpt ? sourceVerified(rating.ai_source_excerpt, aiGrams) : false;
+      const verified =
+        rating.ai_source_excerpt
+          ? sourceVerified(rating.ai_source_excerpt, aiGrams) && relatedToParagraph(rating.ai_source_excerpt, p.text)
+          : false;
       if (verified || floor !== "none") {
         level = rating.reliance;
         disclosed = rating.disclosed;
