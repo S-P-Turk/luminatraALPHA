@@ -7,8 +7,11 @@
 // may want to look at first.
 
 import type { QuizResult, ComprehensionResult } from "./quiz";
+import { buildContributionMap, type ContributionMap } from "./contribution";
 
-export const SCORING_VERSION = "v1";
+// v2: contribution map (copied / paraphrased / AI-assisted) replaces the
+// v1 copy-only text match.
+export const SCORING_VERSION = "v2";
 
 export const WEIGHTS = { textMatch: 45, policy: 30, comprehension: 25 } as const;
 
@@ -19,9 +22,6 @@ export const REVIEW_THRESHOLD = 40;
 // own, maxes out the text-match signal.
 const TEXT_MATCH_FULL_SHARE = 0.3;
 
-// Excerpts shorter than this are ignored — too short to be meaningful evidence.
-const MIN_EXCERPT_WORDS = 8;
-const SHINGLE = 8;
 
 export type SignalKey = keyof typeof WEIGHTS;
 
@@ -38,98 +38,28 @@ export type ScoreCard = {
   score: number; // 0..100
   needsReview: boolean;
   signals: Record<SignalKey, Signal>;
+  contribution: ContributionMap;
 };
-
-// ---------------------------------------------------------------------------
-// Text normalization and passage verification
-
-export function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[‘’]/g, "'")
-    .replace(/[“”]/g, '"')
-    .replace(/[^a-z0-9']+/g, " ")
-    .trim();
-}
-
-function words(norm: string): string[] {
-  return norm ? norm.split(" ") : [];
-}
-
-function shingles(ws: string[], n = SHINGLE): Set<string> {
-  const out = new Set<string>();
-  for (let i = 0; i + n <= ws.length; i++) out.add(ws.slice(i, i + n).join(" "));
-  return out;
-}
-
-/**
- * An AI-proposed excerpt only counts if it really appears in BOTH the
- * submission and the transcript — exact (after normalization) or, failing
- * that, with at least 80% of its 8-word runs found in each. This stops the
- * model from inventing or paraphrasing evidence.
- */
-export function verifyExcerpt(
-  excerpt: string,
-  submissionNorm: string,
-  transcriptNorm: string,
-  submissionShingles: Set<string>,
-  transcriptShingles: Set<string>
-): number {
-  const norm = normalize(excerpt);
-  const ws = words(norm);
-  if (ws.length < MIN_EXCERPT_WORDS) return 0;
-  if (submissionNorm.includes(norm) && transcriptNorm.includes(norm)) return ws.length;
-
-  const own = shingles(ws);
-  if (own.size === 0) return 0;
-  let inSub = 0;
-  let inTr = 0;
-  for (const sh of own) {
-    if (submissionShingles.has(sh)) inSub++;
-    if (transcriptShingles.has(sh)) inTr++;
-  }
-  return inSub / own.size >= 0.8 && inTr / own.size >= 0.8 ? ws.length : 0;
-}
 
 // ---------------------------------------------------------------------------
 // Individual signals
 
-function textMatchSignal(quiz: QuizResult, submission: string, transcript: string): Signal {
+// Paraphrased-without-disclosure counts half as much as a near-exact copy:
+// it's real evidence, but recognizing a paraphrase is a judgment call.
+const PARAPHRASE_WEIGHT = 0.5;
+
+function textMatchSignal(map: ContributionMap, analyzed: boolean): Signal {
   const max = WEIGHTS.textMatch;
-  if (!quiz.ai_passages) {
+  if (!analyzed) {
     return { value: 0, points: 0, max, reason: "Not checked (analyzed before text matching existed)." };
   }
-  const subNorm = normalize(submission);
-  const trNorm = normalize(transcript);
-  const subWords = words(subNorm).length;
-  if (subWords === 0) return { value: 0, points: 0, max, reason: "" };
-
-  const subSh = shingles(words(subNorm));
-  const trSh = shingles(words(trNorm));
-
-  // De-duplicate overlapping excerpts by counting each verified excerpt once.
-  const seen = new Set<string>();
-  let claimedWords = 0;
-  let disclosedWords = 0;
-  for (const p of quiz.ai_passages) {
-    const key = normalize(p.submission_excerpt);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const n = verifyExcerpt(p.submission_excerpt, subNorm, trNorm, subSh, trSh);
-    if (p.claimed_as_own) claimedWords += n;
-    else disclosedWords += n;
-  }
-
-  const share = Math.min(1, claimedWords / subWords);
+  if (map.totalWords === 0) return { value: 0, points: 0, max, reason: "" };
+  const share = Math.min(1, (map.words.copied + PARAPHRASE_WEIGHT * map.words.paraphrased) / map.totalWords);
   const value = Math.min(1, share / TEXT_MATCH_FULL_SHARE);
-  const pct = Math.round(share * 100);
-  // Disclosed AI passages are tracked but don't add to the score: openly
-  // disclosed help is a syllabus question, handled by the policy signal.
-  void disclosedWords;
-  const reason =
-    claimedWords > 0
-      ? `About ${pct}% of the submission matches AI-written text from the transcript that isn't disclosed as AI help.`
-      : "";
+  const parts: string[] = [];
+  if (map.words.copied > 0) parts.push(`${Math.max(1, map.percent.copied)}% copied from AI`);
+  if (map.words.paraphrased > 0) parts.push(`${Math.max(1, map.percent.paraphrased)}% closely paraphrased from AI`);
+  const reason = parts.length ? `${parts.join(" and ")}, not disclosed.` : "";
   return { value, points: Math.round(value * max), max, reason };
 }
 
@@ -164,8 +94,14 @@ export function scoreSubmission(input: {
   transcript: string;
   comprehension?: ComprehensionResult;
 }): ScoreCard {
+  const contribution = buildContributionMap({
+    submission: input.submissionText,
+    transcript: input.transcript,
+    passages: input.quiz.ai_passages,
+    summary: input.quiz.usage_summary,
+  });
   const signals = {
-    textMatch: textMatchSignal(input.quiz, input.submissionText, input.transcript),
+    textMatch: textMatchSignal(contribution, input.quiz.ai_passages !== undefined),
     policy: policySignal(input.quiz),
     comprehension: comprehensionSignal(input.comprehension),
   };
@@ -185,5 +121,6 @@ export function scoreSubmission(input: {
     score,
     needsReview: score >= REVIEW_THRESHOLD || anyMaxed,
     signals,
+    contribution,
   };
 }

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import type { ScoreCard } from "@/src/lib/scoring";
+import { ContributionMapView } from "./ContributionMapView";
 import { toast } from "./Toaster";
 
 export const SIGNAL_LABELS = {
-  textMatch: "AI text in submission",
+  textMatch: "Copied from AI",
   policy: "Syllabus AI rules",
   comprehension: "Comprehension check",
 } as const;
@@ -30,6 +31,7 @@ export type ReviewSubmission = {
   assignmentTitle: string;
   studentName: string;
   studentEmail: string;
+  assignmentText?: string;
   quiz: ReviewQuiz | null;
   quizAnswers: string[] | null;
   studentResponse: string | null;
@@ -232,6 +234,8 @@ export function ReviewCard({
               </div>
             ))
           )}
+
+          {card?.contribution && <ContributionMapView map={card.contribution} text={s.assignmentText} />}
 
           {questions.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

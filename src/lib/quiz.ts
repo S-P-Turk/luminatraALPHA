@@ -24,18 +24,34 @@ Your job, in order:
 
 5. Set policy_severity: "none" if there's no policy_concern; "minor" if the concern is borderline or small in scope (e.g. light AI rewording where the rule is ambiguous); "clear" if the transcript plainly shows AI use the syllabus forbids.
 
-6. If the submitted work is provided, list in ai_passages every passage of the submitted work that appears to have been written by the AI in the transcript (copied or lightly edited from an AI response — NOT text the student wrote and pasted into the chat themselves). For each, give submission_excerpt copied EXACTLY, character for character, from the submitted work (at least 8 words; split long passages into separate entries of up to ~60 words), and claimed_as_own: true if the transcript/disclosure presents that part as the student's own work or doesn't disclose it, false if the student openly disclosed that the AI wrote it. If there are none, return an empty list. Excerpts are verified mechanically against the submission and transcript, so never paraphrase them.
+6. If the submitted work is provided, map where AI contributed to it. In ai_passages, list every passage of the submitted work that derives from an AI reply in the transcript. For each:
+   - submission_excerpt: copied EXACTLY, character for character, from the submitted work (at least 8 words; split long passages into separate entries of up to ~60 words).
+   - transcript_excerpt: the AI reply text it came from, copied EXACTLY from the transcript (the relevant sentence or two, up to ~80 words).
+   - kind: "verbatim" if the AI's wording was copied as-is or with trivial edits (punctuation, a word or two); "paraphrased" if the passage clearly follows the AI reply's specific wording and structure but was reworded; "edited" if the student wrote the text first (it appears in the student's own message) and the AI only corrected or polished it.
+   - claimed_as_own: true if the student presents that part as their own work or doesn't disclose the AI's role; false if they openly disclosed that AI wrote or helped write it.
+   Only use the AI's replies as sources — never text the student typed into the chat. Don't include passages that merely share a topic, facts, or ideas with an AI reply; brainstormed ideas the student wrote up in their own words are the student's writing. If there are none, return an empty list. Excerpts are verified mechanically against the submission and transcript, so never paraphrase them.
+
+7. usage_summary: one plain sentence (under 30 words) describing how the student used AI overall, e.g. "Used AI to brainstorm angles and check grammar; one paragraph was copied from an AI reply without disclosure." If the transcript shows no AI use, say "No AI use shown in the transcript."
 
 Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) describing what in the transcript a teacher should follow up on and which rule it relates to. Never state a conclusion or accuse — the teacher decides; you only point to what is worth a closer look. what_it_tests is a few words. No hedging, no restating the syllabus.
 
 Report your findings using the submit_quiz tool. Don't write any other text.`;
+
+export type AiPassage = {
+  submission_excerpt: string;
+  claimed_as_own: boolean;
+  // Added with the contribution map; absent on older analyses.
+  transcript_excerpt?: string;
+  kind?: "verbatim" | "paraphrased" | "edited";
+};
 
 export type QuizResult = {
   policy_summary: string;
   policy_concern: string | null;
   // Added with the scoring layer; absent on submissions analyzed before it.
   policy_severity?: "none" | "minor" | "clear";
-  ai_passages?: { submission_excerpt: string; claimed_as_own: boolean }[];
+  ai_passages?: AiPassage[];
+  usage_summary?: string;
   claimed_unassisted_areas: string[];
   quiz: { question: string; expected_length: "one_sentence" | "two_sentences"; what_it_tests: string }[];
 };
@@ -61,16 +77,19 @@ const QUIZ_TOOL: Anthropic.Tool = {
       policy_severity: { type: "string", enum: ["none", "minor", "clear"] },
       ai_passages: {
         type: "array",
-        description: "Passages of the submitted work that appear AI-written, copied exactly from the submission.",
+        description: "Passages of the submitted work that derive from AI replies, each with its source AI text.",
         items: {
           type: "object",
           properties: {
             submission_excerpt: { type: "string" },
+            transcript_excerpt: { type: "string" },
+            kind: { type: "string", enum: ["verbatim", "paraphrased", "edited"] },
             claimed_as_own: { type: "boolean" },
           },
-          required: ["submission_excerpt", "claimed_as_own"],
+          required: ["submission_excerpt", "transcript_excerpt", "kind", "claimed_as_own"],
         },
       },
+      usage_summary: { type: "string", description: "One plain sentence on how the student used AI overall." },
       claimed_unassisted_areas: {
         type: "array",
         items: { type: "string" },
@@ -91,7 +110,15 @@ const QUIZ_TOOL: Anthropic.Tool = {
         },
       },
     },
-    required: ["policy_summary", "policy_concern", "policy_severity", "ai_passages", "claimed_unassisted_areas", "quiz"],
+    required: [
+      "policy_summary",
+      "policy_concern",
+      "policy_severity",
+      "ai_passages",
+      "usage_summary",
+      "claimed_unassisted_areas",
+      "quiz",
+    ],
   },
 };
 

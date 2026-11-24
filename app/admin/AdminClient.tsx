@@ -424,7 +424,7 @@ export default function AdminClient() {
                       {(["textMatch", "policy", "comprehension"] as const).map((k) => (
                         <div key={k}>
                           <strong>
-                            {k === "textMatch" ? "AI text" : k === "policy" ? "Syllabus rules" : "Comprehension"}{" "}
+                            {k === "textMatch" ? "Copied from AI" : k === "policy" ? "Syllabus rules" : "Comprehension"}{" "}
                             {res.card.signals[k].points}/{res.card.signals[k].max}:
                           </strong>{" "}
                           {res.card.signals[k].reason || <span style={{ color: colors.muted }}>nothing notable</span>}

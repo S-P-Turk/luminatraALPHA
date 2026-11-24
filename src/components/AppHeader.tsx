@@ -152,6 +152,7 @@ export function AppHeader() {
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
+                whiteSpace: "nowrap",
               }}
             >
               Sign out

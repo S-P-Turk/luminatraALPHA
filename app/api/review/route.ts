@@ -47,7 +47,7 @@ export async function GET() {
       // grading existed) so failed comprehension shows up as a flag.
       const graded = await gradeIfNeeded(s);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { assignmentText, transcript, ...rest } = s;
+      const { transcript, ...rest } = s;
       submissions.push({
         ...rest,
         ...graded,

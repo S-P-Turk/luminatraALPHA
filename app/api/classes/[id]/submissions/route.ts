@@ -58,7 +58,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
   for (const s of submissions) {
     const graded = await gradeIfNeeded(s);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { assignmentText, transcript, ...rest } = s;
+    const { transcript, ...rest } = s;
     out.push({ ...rest, ...graded, assignmentTitle: assignmentTitles.get(s.assignmentId) });
   }
 
