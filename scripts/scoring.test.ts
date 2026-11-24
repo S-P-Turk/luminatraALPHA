@@ -133,6 +133,38 @@ t("a real AI reply that's unrelated to the paragraph can't label it", () => {
   assert.equal(c.reliance.rejected, 1);
 });
 
+t("measured cap: 'heavy' with few shared key words becomes 'ideas'", () => {
+  const argument = "One overlooked factor is the stab-in-the-back myth: because civilian politicians signed the treaty, nationalists could blame the Weimar Republic rather than the army for defeat.";
+  const ownWords = "What stood out to me is that nationalists got to shift the blame. Since civilians signed it, people could pretend the army never really lost, and that lie made the republic look like traitors.";
+  const c = scoreSubmission({
+    quiz: { ...base, paragraphs: [rate(1, "heavy", { ai_source_excerpt: argument })] },
+    submissionText: ownWords,
+    transcript: `User: angle?\nAssistant: ${argument}`,
+  });
+  assert.equal(c.reliance.paragraphs[0].level, "ideas");
+  assert.equal(c.reliance.paragraphs[0].adjustedFrom, "heavy");
+});
+
+t("measured cap: 'written' that's only paraphrased becomes 'heavy'", () => {
+  const src = "Kant's critics, most famously Benjamin Constant, argued that the duty to tell the truth applies only to those who have a right to the truth, and a murderer seeking a victim has forfeited that right.";
+  const para = "Kant's critics, most famously Benjamin Constant, said the duty to tell the truth only applies to people who have a right to the truth, and a murderer looking for a victim has forfeited that right.";
+  const c = scoreSubmission({
+    quiz: { ...base, paragraphs: [rate(1, "written", { ai_source_excerpt: src })] },
+    submissionText: para,
+    transcript: `User: explain\nAssistant: ${src}`,
+  });
+  assert.equal(c.reliance.paragraphs[0].level, "heavy");
+});
+
+t("measured cap never lowers verified copied text below 'written'", () => {
+  const c = scoreSubmission({
+    quiz: { ...base, ai_passages: [copied()], paragraphs: [rate(1, "none"), rate(2, "written")] },
+    submissionText: twoPara,
+    transcript,
+  });
+  assert.equal(c.reliance.paragraphs[1].level, "written");
+});
+
 t("disclosed reliance is shown but scores 0", () => {
   const c = scoreSubmission({
     quiz: { ...base, ai_passages: [copied({ claimed_as_own: false })], paragraphs: [rate(1, "none"), rate(2, "written", { disclosed: true })] },

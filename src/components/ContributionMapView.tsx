@@ -168,6 +168,12 @@ export function ContributionMapView({
                   {on && (
                     <div style={{ marginTop: 6, fontSize: 12 }}>
                       {p.note && <div>{p.note}</div>}
+                      {p.keywordShare !== undefined && (
+                        <div style={{ color: "var(--lum-muted)", marginTop: 2 }}>
+                          Measured: {Math.round(p.keywordShare * 100)}% of this paragraph&apos;s key words and{" "}
+                          {Math.round((p.phraseShare ?? 0) * 100)}% of its phrases match the AI reply below.
+                        </div>
+                      )}
                       {p.source ? (
                         <>
                           <div style={{ color: "var(--lum-muted)", marginTop: 4 }}>From the AI&apos;s reply in the transcript:</div>

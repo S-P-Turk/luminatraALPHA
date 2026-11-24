@@ -175,7 +175,9 @@ function build(c: Course): EvalCase[] {
       "knows_work",
       noAI ? "review" : "no_review",
       noAI ? "Syllabus bans all AI, including brainstorming." : "Brainstorming is allowed and disclosed.",
-      "none"
+      // The bio brainstorm names "denaturation", which the paragraph then
+      // uses, so idea-level (disclosed) reliance is the right label there.
+      c.key === "bio" ? "ideas" : "none"
     ),
     mk(
       3,

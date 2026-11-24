@@ -35,9 +35,10 @@ Your job, in order:
 
 8. Rate AI reliance for every numbered paragraph of the submitted work (if provided) in paragraphs — how much of that paragraph's substance came from the AI, counting ideas as well as wording:
    - "none": the student's own ideas and writing (AI may have fixed grammar or spelling only).
-   - "ideas": the student wrote it, but the key idea, argument, example, source, or structure came from an AI reply.
-   - "heavy": it closely follows an AI reply — reworded, but the substance and flow are the AI's.
-   - "written": the AI wrote most of it (copied or lightly edited).
+   - "ideas": the AI supplied the point (an idea, argument, example, or source), but the student expressed it in their own words and their own sentence structure — you could not match it to the AI reply phrase by phrase.
+   - "heavy": the paragraph tracks an AI reply sentence by sentence, reusing most of its key terms and much of its phrasing, just reworded.
+   - "written": the AI's sentences appear nearly word for word (copied, or only lightly edited).
+   Cite the complete AI sentence(s) the paragraph draws on as ai_source_excerpt — the source is measured against the paragraph to confirm the level.
    For each, give index, reliance, disclosed (true only if the student openly said AI did this), a note (under 15 words, e.g. "Argument about hyperinflation comes from the AI's explanation."), and ai_source_excerpt: the AI reply text it came from, copied EXACTLY from the transcript (empty string for "none"). Only AI replies count as sources, never the student's own messages. A rating above "none" with no real source in the transcript is not allowed.
 
 Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) describing what in the transcript a teacher should follow up on and which rule it relates to. Never state a conclusion or accuse — the teacher decides; you only point to what is worth a closer look. what_it_tests is a few words. No hedging, no restating the syllabus.

@@ -30,6 +30,9 @@ export type ParagraphResult = {
   note: string;
   source: string | null;
   evidence: "source" | "copied-text" | "none";
+  keywordShare?: number; // measured overlap with the cited AI source
+  phraseShare?: number;
+  adjustedFrom?: RelianceLevel; // the analyzer's label, if the measurement capped it
 };
 
 export type RelianceResult = {
@@ -83,6 +86,44 @@ export function relatedToParagraph(source: string, paragraph: string): boolean {
   return shared >= 3 || (a.size > 0 && shared / a.size >= 0.2);
 }
 
+// Measured lines between levels, calibrated on the test set (Nov 24):
+//   "ideas" paragraphs share 27–37% of their key words with the AI source
+//   and no 3-word phrases; "heavy" 76–87% key words, 37–61% phrases;
+//   "written" ~100% of both. The analyzer's label is capped by what the
+//   measurement supports, so every label is explainable with a number.
+export const HEAVY_MIN_KEYWORD_SHARE = 0.55;
+export const WRITTEN_MIN_PHRASE_SHARE = 0.75;
+
+/** Share of the paragraph's key words (stems) that appear in the source. */
+export function keywordShare(paragraph: string, source: string): number {
+  const a = stems(paragraph);
+  const b = stems(source);
+  let hit = 0;
+  for (const w of a) if (b.has(w)) hit++;
+  return a.size ? hit / a.size : 0;
+}
+
+/** Share of the paragraph's 3-word phrases that appear verbatim in the source. */
+export function phraseShare(paragraph: string, source: string): number {
+  const p = tokenize(paragraph).map((t) => t.word);
+  const src = ngrams(tokenize(source).map((t) => t.word), 3);
+  let hit = 0;
+  let total = 0;
+  for (let i = 0; i + 3 <= p.length; i++) {
+    total++;
+    if (src.has(p.slice(i, i + 3).join(" "))) hit++;
+  }
+  return total ? hit / total : 0;
+}
+
+/** The highest level the measured overlap with the cited source supports. */
+export function supportedLevel(claimed: RelianceLevel, paragraph: string, source: string): RelianceLevel {
+  let level = claimed;
+  if (level === "written" && phraseShare(paragraph, source) < WRITTEN_MIN_PHRASE_SHARE) level = "heavy";
+  if (level === "heavy" && keywordShare(paragraph, source) < HEAVY_MIN_KEYWORD_SHARE) level = "ideas";
+  return level;
+}
+
 const maxLevel = (a: RelianceLevel, b: RelianceLevel) => (RANK[a] >= RANK[b] ? a : b);
 
 export function computeReliance(input: {
@@ -121,18 +162,31 @@ export function computeReliance(input: {
     let note = "";
     let source: string | null = null;
     let evidence: ParagraphResult["evidence"] = "none";
+    let kShare: number | undefined;
+    let pShare: number | undefined;
+    let adjustedFrom: RelianceLevel | undefined;
 
     if (rating && rating.reliance !== "none") {
       const verified =
         rating.ai_source_excerpt
           ? sourceVerified(rating.ai_source_excerpt, aiGrams) && relatedToParagraph(rating.ai_source_excerpt, p.text)
           : false;
-      if (verified || floor !== "none") {
-        level = rating.reliance;
+      if (verified) {
+        // Cap the analyzer's label at what the measured overlap supports.
+        level = supportedLevel(rating.reliance, p.text, rating.ai_source_excerpt);
+        if (level !== rating.reliance) adjustedFrom = rating.reliance;
+        kShare = keywordShare(p.text, rating.ai_source_excerpt);
+        pShare = phraseShare(p.text, rating.ai_source_excerpt);
         disclosed = rating.disclosed;
         note = rating.note;
-        source = verified ? rating.ai_source_excerpt : null;
-        evidence = verified ? "source" : "copied-text";
+        source = rating.ai_source_excerpt;
+        evidence = "source";
+      } else if (floor !== "none") {
+        // No usable source quote: only the verified copied text counts.
+        level = floor;
+        disclosed = rating.disclosed;
+        note = rating.note;
+        evidence = "copied-text";
       } else {
         rejected++; // a rating with no real AI source behind it doesn't count
       }
@@ -146,7 +200,20 @@ export function computeReliance(input: {
       if (!note) note = floor === "written" ? "Mostly copied from an AI reply." : "Closely follows AI-written text.";
     }
 
-    return { index: p.index, start: p.start, end: p.end, words, level, disclosed, note, source, evidence };
+    return {
+      index: p.index,
+      start: p.start,
+      end: p.end,
+      words,
+      level,
+      disclosed,
+      note,
+      source,
+      evidence,
+      keywordShare: kShare,
+      phraseShare: pShare,
+      adjustedFrom,
+    };
   });
 
   const total = results.reduce((n, p) => n + p.words, 0) || 1;

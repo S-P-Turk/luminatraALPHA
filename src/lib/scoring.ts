@@ -13,7 +13,8 @@ import { computeReliance, type RelianceResult } from "./reliance";
 // v2: contribution map (copied / paraphrased / AI-assisted).
 // v3: AI reliance (ideas + wording, per paragraph) replaces copied-text share;
 //     comprehension becomes the heaviest signal.
-export const SCORING_VERSION = "v3";
+// v3.1: reliance labels capped by measured overlap with the AI source.
+export const SCORING_VERSION = "v3.1";
 
 export const WEIGHTS = { comprehension: 45, reliance: 30, policy: 25 } as const;
 

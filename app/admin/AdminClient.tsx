@@ -88,7 +88,12 @@ export default function AdminClient() {
         const id = queue.shift()!;
         setRows((prev) => prev.map((r) => (r.info.id === id ? { ...r, state: "running" } : r)));
         try {
-          const res = await fetch(`/api/admin/eval/${id}`, { method: "POST" });
+          let res = await fetch(`/api/admin/eval/${id}`, { method: "POST" });
+          if (!res.ok && res.status !== 401 && res.status !== 404) {
+            // One automatic retry for transient AI-service errors.
+            await new Promise((r) => setTimeout(r, 3000));
+            res = await fetch(`/api/admin/eval/${id}`, { method: "POST" });
+          }
           const data = await res.json().catch(() => ({}));
           setRows((prev) =>
             prev.map((r) =>
