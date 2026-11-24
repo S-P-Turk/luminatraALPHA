@@ -76,7 +76,8 @@ export function AppHeader() {
   async function signOut() {
     await fetch(area === "student" ? "/api/auth/student-logout" : "/api/auth/logout", { method: "POST" });
     setSession(null);
-    router.push("/");
+    // Straight back to a fresh sign-in screen for the same role.
+    router.push(area === "student" ? "/student/login" : "/login");
   }
 
   const home = area === "student" && session?.student ? "/student" : area === "teacher" && session?.teacher ? "/classes" : "/";

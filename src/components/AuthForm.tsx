@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "./Spinner";
@@ -33,6 +33,23 @@ export function AuthForm({ role }: { role: Role }) {
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Next.js keeps recently visited pages alive in the background (React
+  // Activity), so without this the form would come back on its old step
+  // (e.g. "Create your password") after signing out. Reset whenever the
+  // form is hidden, so every visit starts fresh at the email step.
+  useLayoutEffect(() => {
+    return () => {
+      setStep("email");
+      setEmail("");
+      setName("");
+      setPassword("");
+      setConfirm("");
+      setShow(false);
+      setError(null);
+      setLoading(false);
+    };
+  }, []);
 
   const creating = step === "set_password" || step === "new";
 
