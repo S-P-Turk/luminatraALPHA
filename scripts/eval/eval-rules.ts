@@ -5,6 +5,7 @@
 // what it permits for six common uses. Compare with the hand labels.
 //
 //   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts            # all labeled
+//   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts real-      # only the real policies
 //   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts pol-cs     # id prefix
 //   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts --propose  # suggest labels for imported policies
 //
@@ -19,6 +20,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { callClaude } from "../../src/lib/ai";
 import { generateRulesCard, type RulesCard } from "../../src/lib/rules";
 import { POLICY_CASES, USES, type PolicyCase, type Stance, type Use } from "../../src/lib/eval/policies";
+import { REAL_POLICY_CASES } from "../../src/lib/eval/policies-real";
 
 const IMPORTED = "src/lib/eval/policies-imported.json";
 const STANCES: Stance[] = ["allowed", "with_disclosure", "not_allowed", "unclear"];
@@ -96,7 +98,7 @@ async function main() {
   } catch {
     imported = [];
   }
-  const cases = [...POLICY_CASES, ...imported].filter(
+  const cases = [...REAL_POLICY_CASES, ...POLICY_CASES, ...imported].filter(
     (p) => p.id.startsWith(prefix) && Object.keys(p.expected).length > 0 && !(p as { labelsProposed?: boolean }).labelsProposed
   );
   console.log(`Checking rules cards for ${cases.length} labeled policies...\n`);

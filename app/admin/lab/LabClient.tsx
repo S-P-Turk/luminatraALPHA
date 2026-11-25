@@ -1,6 +1,8 @@
 "use client";
 
-import { POLICY_CASES } from "@/src/lib/eval/policies";
+import { POLICY_CASES as SYNTHETIC_POLICIES } from "@/src/lib/eval/policies";
+import { REAL_POLICY_CASES } from "@/src/lib/eval/policies-real";
+const POLICY_CASES = [...REAL_POLICY_CASES, ...SYNTHETIC_POLICIES];
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { K, Cell, Btn, Header, Grid, th, td, tdMono, Loading, usd, Bar } from "../ui";
 import { toast } from "@/src/components/Toaster";
@@ -354,8 +356,11 @@ export default function LabClient() {
               {saved.map((r) => <option key={r.info.id} value={r.info.id}>{r.info.id} · {r.info.scenario}</option>)}
             </optgroup>
           )}
-          <optgroup label={`Syllabus library (${POLICY_CASES.length}, syllabus only)`}>
-            {POLICY_CASES.map((p) => <option key={p.id} value={p.id}>{p.discipline} · {p.tier} · {p.course}</option>)}
+          <optgroup label={`Real course policies (${REAL_POLICY_CASES.length}, syllabus only)`}>
+            {REAL_POLICY_CASES.map((p) => <option key={p.id} value={p.id}>{p.discipline} · {p.tier} · {p.course.split(" · ").slice(0, 2).join(" · ")}</option>)}
+          </optgroup>
+          <optgroup label={`Written examples (${SYNTHETIC_POLICIES.length}, syllabus only)`}>
+            {SYNTHETIC_POLICIES.map((p) => <option key={p.id} value={p.id}>{p.discipline} · {p.tier} · {p.course}</option>)}
           </optgroup>
           <optgroup label="Built-in test set">
             {builtIn.map((r) => <option key={r.info.id} value={r.info.id}>{r.info.id} · {r.info.scenario}</option>)}

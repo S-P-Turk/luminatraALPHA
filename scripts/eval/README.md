@@ -12,10 +12,14 @@ Re-run after any change to prompts, weights or the threshold (`src/lib/scoring.t
 
 ## Syllabus library (rules cards)
 
+`src/lib/eval/policies-real.ts` holds 39 **real** course AI policies from public syllabi and course/department pages (about 30 institutions, 18 subjects, mostly Fall 2025), each with a source link, a real assignment from the same syllabus where one was available, and hand labels. The policy text is a rule-by-rule condensation that keeps every condition, exception, tool name and disclosure rule; follow the source link for the original wording. Internal testing only; don't publish.
+
+
 `src/lib/eval/policies.ts` holds 30 course AI policies across 29 disciplines and five tiers (prohibited, limited, disclosure, open, mixed), each with an assignment and hand labels for what it says about six uses: brainstorm, grammar, paraphrase, draft, research, code. They are synthetic but mirror patterns in published policies: tool-specific rules, assignment-level exceptions, privacy rules on top of AI rules, vague wording, contradictions. Each has a `quirk` saying what makes it hard.
 
 ```bash
-ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts        # ~60 calls, well under $1
+ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts        # all 69 policies, ~140 calls, about $1
+ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts real-  # only the real ones
 ```
 
 It writes each rules card the way the app does, has a separate call read only the card, and compares to the labels. Watch "too strict" (card forbids what the policy allows) and "too lenient" (card allows what the policy forbids).
