@@ -43,25 +43,20 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
     .orderBy((s) => s.createdAt.desc())
     .all();
 
-  // Prototype scale — a per-submission lookup is fine; avoids needing a
-  // relation include for just the assignment title.
-  const assignmentTitles = new Map<number, string>();
-  for (const s of submissions) {
-    if (assignmentTitles.has(s.assignmentId)) continue;
-    const assignment = await db.orm.public.Assignment
-      .where({ id: s.assignmentId })
-      .select("title")
-      .first();
-    assignmentTitles.set(s.assignmentId, assignment?.title ?? "Untitled assignment");
-  }
+  // One query for every assignment title, then grade all waiting quiz
+  // answers at once instead of one after another.
+  const ids = [...new Set(submissions.map((s) => s.assignmentId))];
+  const titles = await Promise.all(
+    ids.map((aid) => db.orm.public.Assignment.where({ id: aid }).select("id", "title").first())
+  );
+  const assignmentTitles = new Map(titles.filter(Boolean).map((a) => [a!.id, a!.title]));
 
-  const out = [];
-  for (const s of submissions) {
-    const graded = await gradeIfNeeded(s);
+  const graded = await Promise.all(submissions.map((s) => gradeIfNeeded(s)));
+  const out = submissions.map((s, i) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { transcript, ...rest } = s;
-    out.push({ ...rest, ...graded, assignmentTitle: assignmentTitles.get(s.assignmentId) });
-  }
+    return { ...rest, ...graded[i], assignmentTitle: assignmentTitles.get(s.assignmentId) ?? "Untitled assignment" };
+  });
 
   return NextResponse.json({
     class: { id: cls.id, name: cls.name, joinCode: cls.joinCode },

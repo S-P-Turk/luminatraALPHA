@@ -16,47 +16,49 @@ export async function GET() {
     .select("id", "name")
     .all();
 
-  // Prototype scale: one query per class and per assignment title is fine.
-  const assignmentTitles = new Map<number, string>();
-  const submissions = [];
-  for (const cls of classes) {
-    const rows = await db.orm.public.Submission
-      .where({ classId: cls.id })
-      .select(
-        "id",
-        "classId",
-        "assignmentId",
-        "studentName",
-        "studentEmail",
-        "assignmentText",
-        "transcript",
-        "quiz",
-        "quizAnswers",
-        "reportCard",
-        "studentResponse",
-        "revisions",
-        "status",
-        "createdAt"
-      )
-      .all();
-    for (const s of rows) {
-      if (!assignmentTitles.has(s.assignmentId)) {
-        const a = await db.orm.public.Assignment.where({ id: s.assignmentId }).select("title").first();
-        assignmentTitles.set(s.assignmentId, a?.title ?? "Untitled assignment");
-      }
-      // Grades any answered-but-ungraded quiz (e.g. ones answered before
-      // grading existed) so failed comprehension shows up as a flag.
-      const graded = await gradeIfNeeded(s);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { transcript, ...rest } = s;
-      submissions.push({
-        ...rest,
-        ...graded,
-        className: cls.name,
-        assignmentTitle: assignmentTitles.get(s.assignmentId),
-      });
-    }
-  }
+  // Load every class's submissions in parallel, look up titles once, and
+  // grade all waiting quiz answers at once instead of one after another.
+  const perClass = await Promise.all(
+    classes.map((cls) =>
+      db.orm.public.Submission
+        .where({ classId: cls.id })
+        .select(
+          "id",
+          "classId",
+          "assignmentId",
+          "studentName",
+          "studentEmail",
+          "assignmentText",
+          "transcript",
+          "quiz",
+          "quizAnswers",
+          "reportCard",
+          "studentResponse",
+          "revisions",
+          "status",
+          "createdAt"
+        )
+        .all()
+        .then((rows) => rows.map((s) => ({ s, className: cls.name })))
+    )
+  );
+  const rows = perClass.flat();
+  const ids = [...new Set(rows.map((r) => r.s.assignmentId))];
+  const titles = await Promise.all(
+    ids.map((aid) => db.orm.public.Assignment.where({ id: aid }).select("id", "title").first())
+  );
+  const assignmentTitles = new Map(titles.filter(Boolean).map((a) => [a!.id, a!.title]));
+  const graded = await Promise.all(rows.map((r) => gradeIfNeeded(r.s)));
+  const submissions = rows.map(({ s, className }, i) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { transcript, ...rest } = s;
+    return {
+      ...rest,
+      ...graded[i],
+      className,
+      assignmentTitle: assignmentTitles.get(s.assignmentId) ?? "Untitled assignment",
+    };
+  });
 
   submissions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

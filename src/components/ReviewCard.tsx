@@ -70,6 +70,8 @@ function badgeFor(status: string) {
   if (status === "flagged") return { label: "Needs review", bg: colors.amberBg, fg: colors.amber };
   if (status === "cleared") return { label: "Cleared", bg: "#E7F1EB", fg: colors.green };
   if (status === "follow_up") return { label: "Following up", bg: "#E8ECF5", fg: "#3B5A8A" };
+  if (status === "analyzing") return { label: "Analyzing", bg: "#EFEDE6", fg: colors.muted };
+  if (status === "analysis_failed") return { label: "Analysis failed", bg: "#EFEDE6", fg: colors.muted };
   return { label: "Clean", bg: "#EFEDE6", fg: colors.muted };
 }
 
@@ -193,7 +195,8 @@ export function ReviewCard({
 
       {(s.revisions?.length ?? 0) > 0 && (
         <div style={{ fontSize: 12, color: colors.muted, marginTop: 6 }}>
-          Revised {s.revisions!.length}× after seeing the score:{" "}
+          Revised {s.revisions!.length}× after seeing the score
+          {s.revisions!.some((r) => (r as { addedChat?: boolean }).addedChat) ? " (added AI chat)" : ""}:{" "}
           {s.revisions!.map((r) => (r.score == null ? "–" : r.score)).join(" → ")} → {card?.score ?? "–"}
         </div>
       )}

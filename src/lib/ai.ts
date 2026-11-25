@@ -111,17 +111,30 @@ export async function callClaude(
     throw new BudgetPausedError();
   }
 
+  // Cache the fixed part of every request (tool schema + system prompt), so
+  // repeat calls skip re-reading it: faster first token, ~90% cheaper input
+  // for that part. Prompts under the model's minimum just aren't cached.
+  const cached: Anthropic.MessageCreateParamsNonStreaming =
+    typeof params.system === "string"
+      ? { ...params, system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }] }
+      : params;
+
   const started = Date.now();
   let message: Anthropic.Message | null = null;
   let error: unknown = null;
   try {
-    message = await anthropic.messages.create(params);
+    message = await anthropic.messages.create(cached);
   } catch (e) {
     error = e;
   }
-  const inputTokens = message?.usage?.input_tokens ?? 0;
-  const outputTokens = message?.usage?.output_tokens ?? 0;
-  const costUsd = costOf(inputTokens, outputTokens);
+  const u = message?.usage;
+  const cacheWrite = u?.cache_creation_input_tokens ?? 0;
+  const cacheRead = u?.cache_read_input_tokens ?? 0;
+  const inputTokens = (u?.input_tokens ?? 0) + cacheWrite + cacheRead;
+  const outputTokens = u?.output_tokens ?? 0;
+  // Cache writes bill at 1.25x input, cache reads at 0.1x.
+  const costUsd =
+    costOf(u?.input_tokens ?? 0, outputTokens) + ((cacheWrite * 1.25 + cacheRead * 0.1) * PRICE_IN) / 1_000_000;
   try {
     const db = await getDb();
     if (db) await db.orm.public.ApiCall.create({

@@ -90,6 +90,7 @@ export default function StudentAssignmentClient() {
   const [transcript, setTranscript] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [revising, setRevising] = useState(false);
+  const [addedTranscript, setAddedTranscript] = useState("");
 
   const [answers, setAnswers] = useState<string[]>([]);
   const [savingAnswers, setSavingAnswers] = useState(false);
@@ -101,6 +102,27 @@ export default function StudentAssignmentClient() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
+
+  // While the analysis runs in the background, check back every 3 seconds.
+  const analyzing = detail?.submission?.status === "analyzing";
+  useEffect(() => {
+    if (!analyzing) return;
+    const t = setInterval(() => void load(), 3000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analyzing]);
+
+  async function retryAnalysis() {
+    setError(null);
+    const res = await fetch(`/api/student/assignments/${params.id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ retry: true }),
+    });
+    const data = await res.json();
+    if (!res.ok) return setError(data.error ?? "Couldn't retry.");
+    setDetail((d) => (d ? { ...d, submission: data.submission } : d));
+  }
 
   async function load() {
     const res = await fetch(`/api/student/assignments/${params.id}`);
@@ -131,7 +153,7 @@ export default function StudentAssignmentClient() {
       const res = await fetch(`/api/student/assignments/${params.id}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentText, transcript }),
+        body: JSON.stringify(revising ? { assignmentText, addedTranscript } : { assignmentText, transcript }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -142,8 +164,9 @@ export default function StudentAssignmentClient() {
       // Reload so the quiz stays hidden unless the teacher has activated it.
       const wasRevision = revising;
       setRevising(false);
-      await load();
-      toast(wasRevision ? "Revision submitted. Your new score is below." : "Submitted. Your score is below.");
+      setAddedTranscript("");
+      setDetail((d) => (d ? { ...d, submission: data.submission } : d));
+      toast(wasRevision ? "Revision received. Analyzing it now." : "Submitted. Analyzing it now.");
     } finally {
       setSubmitting(false);
     }
@@ -275,7 +298,10 @@ export default function StudentAssignmentClient() {
           >
             <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
               {revising
-                ? `Edit your work or transcript and resubmit. Your teacher sees every version. ${submission ? submission.maxRevisions - submission.revisionsUsed - 1 : 0} revision(s) left after this one.`
+                ? (() => {
+                    const left = submission ? submission.maxRevisions - submission.revisionsUsed - 1 : 0;
+                    return `Replace your assignment and add any new AI chat. Your teacher sees every version. ${left === 0 ? "This is your last revision." : `${left} more revision${left === 1 ? "" : "s"} after this one.`}`;
+                  })()
                 : "Paste your work and your AI conversation (if you used one). You'll see your score right after you submit, and you can revise before the quiz starts."}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -289,18 +315,44 @@ export default function StudentAssignmentClient() {
                 style={inputStyle}
               />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>AI conversation transcript</label>
-              <textarea
-                required
-                rows={10}
-                value={transcript}
-                onChange={(e) => setTranscript(e.target.value)}
-                placeholder="Paste your AI chat transcript, or write 'I did not use AI for this assignment.'"
-                style={inputStyle}
-              />
-            </div>
-            {submitting && <WorkingNote message="Analyzing your submission…" hint="This usually takes 20–40 seconds. Keep this page open." />}
+            {revising ? (
+              <>
+                <details style={{ fontSize: 13 }}>
+                  <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                    Your AI conversation so far (locked, can&apos;t be edited or removed)
+                  </summary>
+                  <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", background: "#F3F1EC", borderRadius: 8, padding: "10px 12px", maxHeight: 240, overflow: "auto", margin: "6px 0 0" }}>
+                    {submission?.transcript}
+                  </pre>
+                </details>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label htmlFor="added-transcript" style={{ fontSize: 13, fontWeight: 600 }}>
+                    Add another AI conversation <span style={{ fontWeight: 400, color: colors.muted }}>(optional, if you used AI while revising)</span>
+                  </label>
+                  <textarea
+                    id="added-transcript"
+                    rows={6}
+                    value={addedTranscript}
+                    onChange={(e) => setAddedTranscript(e.target.value)}
+                    placeholder="Paste any new AI chat here. It's added after your original conversation."
+                    style={inputStyle}
+                  />
+                </div>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>AI conversation transcript</label>
+                <textarea
+                  required
+                  rows={10}
+                  value={transcript}
+                  onChange={(e) => setTranscript(e.target.value)}
+                  placeholder="Paste your AI chat transcript, or write 'I did not use AI for this assignment.'"
+                  style={inputStyle}
+                />
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={submitting}
@@ -327,7 +379,22 @@ export default function StudentAssignmentClient() {
           </form>
         )}
 
-        {submission?.result && !revising && (
+        {submission?.status === "analyzing" && !revising && (
+          <div style={{ background: "#fff", border: `1px solid ${colors.border}`, borderRadius: 10, padding: "16px 18px" }}>
+            <WorkingNote message="Analyzing your submission…" hint="Usually 20–40 seconds. You can leave this page; your result will be here when you come back." />
+          </div>
+        )}
+
+        {submission?.status === "analysis_failed" && !revising && (
+          <div style={{ background: colors.amberBg, border: `1px solid ${colors.amber}`, borderRadius: 10, padding: "16px 18px", fontSize: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+            <span>The analysis didn&apos;t finish. Your work is saved. Trying again doesn&apos;t use a revision.</span>
+            <button type="button" onClick={() => void retryAnalysis()} style={{ alignSelf: "flex-start", background: colors.ink, color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {submission?.result && !revising && submission.status !== "analyzing" && (
           <ResultPanel
             result={submission.result}
             canRevise={
@@ -339,7 +406,7 @@ export default function StudentAssignmentClient() {
             revisionsLeft={submission.maxRevisions - submission.revisionsUsed}
             onRevise={() => {
               setAssignmentText(submission.assignmentText);
-              setTranscript(submission.transcript);
+              setAddedTranscript("");
               setRevising(true);
             }}
           />
