@@ -72,7 +72,7 @@ export default function SpendingClient() {
   if (!data) {
     return (
       <>
-        <Header sheet="sheet 03 / spending" title="API spending" />
+        <Header sheet="luminatra / admin / api spending" title="API spending" />
         <Loading />
       </>
     );
@@ -87,9 +87,9 @@ export default function SpendingClient() {
 
   return (
     <>
-      <Header sheet={`sheet 03 / spending — ${data.month}`} title="API spending">
+      <Header sheet={`luminatra / admin / api spending · ${data.month}`} title="API spending">
         <Btn onClick={() => { setData(null); void load(); }}>refresh</Btn>
-        <LinkBtn href="/api/admin/spending/csv">calls.csv</LinkBtn>
+        <LinkBtn href="/api/admin/spending/csv">Calls CSV</LinkBtn>
       </Header>
 
       <Grid min={220}>
@@ -147,11 +147,11 @@ export default function SpendingClient() {
           <form onSubmit={saveBudget} style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginTop: 14 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: K.mono, fontSize: 11, color: K.mute }}>
               monthly budget ($)
-              <input type="number" min="0" step="1" required value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} style={{ width: 140, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 0, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
+              <input type="number" min="0" step="1" required value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} style={{ width: 140, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 6, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: K.mono, fontSize: 11, color: K.mute }}>
               alert at (%)
-              <input type="number" min="1" max="100" step="1" required value={alertInput} onChange={(e) => setAlertInput(e.target.value)} style={{ width: 110, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 0, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
+              <input type="number" min="1" max="100" step="1" required value={alertInput} onChange={(e) => setAlertInput(e.target.value)} style={{ width: 110, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 6, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
             </label>
             <Btn type="submit" primary disabled={saving}>{saving ? "saving…" : "save"}</Btn>
           </form>

@@ -50,7 +50,7 @@ export default function QualityClient() {
   if (!data) {
     return (
       <>
-        <Header sheet="sheet 04 / quality" title="Model quality" />
+        <Header sheet="luminatra / admin / model quality" title="Model quality" />
         <Loading />
       </>
     );
@@ -71,7 +71,7 @@ export default function QualityClient() {
 
   return (
     <>
-      <Header sheet={`sheet 04 / quality — scoring ${data.version}`} title="Model quality">
+      <Header sheet={`luminatra / admin / model quality · scoring ${data.version}`} title="Model quality">
         <Btn onClick={() => { setData(null); void load(); }}>refresh</Btn>
         <LinkBtn href="/admin/lab#test-set" primary>run test set</LinkBtn>
       </Header>

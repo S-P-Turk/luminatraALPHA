@@ -69,9 +69,9 @@ export default function OverviewClient() {
 
   return (
     <>
-      <Header sheet="sheet 01 / overview" title="Overview">
+      <Header sheet="luminatra / admin / overview" title="Overview">
         <Btn onClick={() => { setData(null); void load(); }}>refresh</Btn>
-        <LinkBtn href="/api/admin/report">export.csv</LinkBtn>
+        <LinkBtn href="/api/admin/report">Export CSV</LinkBtn>
       </Header>
 
       {error && <div style={{ fontFamily: K.mono, fontSize: 13, color: K.clay }}>{error}</div>}
@@ -206,7 +206,7 @@ export default function OverviewClient() {
                     placeholder="email@school.edu"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    style={{ flex: "1 1 220px", background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 0, padding: "9px 12px", fontFamily: K.mono, fontSize: 13 }}
+                    style={{ flex: "1 1 220px", background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 6, padding: "9px 12px", fontFamily: K.mono, fontSize: 13 }}
                   />
                   <Btn type="submit" disabled={resetting || !resetEmail}>{resetting ? "resetting…" : "reset"}</Btn>
                 </div>

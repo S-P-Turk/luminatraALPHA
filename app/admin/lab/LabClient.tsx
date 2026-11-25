@@ -47,7 +47,7 @@ const area: React.CSSProperties = {
   background: K.bg,
   color: K.fg,
   border: `1px solid ${K.line}`,
-  borderRadius: 0,
+  borderRadius: 6,
   padding: "10px 12px",
   fontFamily: K.mono,
   fontSize: 12.5,
@@ -308,7 +308,7 @@ export default function LabClient() {
       type="button"
       aria-pressed={mode === m}
       onClick={() => setMode(m)}
-      style={{ fontFamily: K.mono, fontSize: 12, padding: "8px 12px", minHeight: 36, border: "none", borderRadius: 0, background: mode === m ? K.sig : "transparent", color: mode === m ? K.bg : K.fg, cursor: "pointer" }}
+      style={{ fontFamily: K.mono, fontSize: 12, padding: "8px 12px", minHeight: 36, border: "none", borderRadius: 6, background: mode === m ? K.sig : "transparent", color: mode === m ? K.bg : K.fg, cursor: "pointer" }}
     >
       {label}
     </button>
@@ -319,7 +319,7 @@ export default function LabClient() {
       type="button"
       aria-pressed={filter === f}
       onClick={() => setFilter(f)}
-      style={{ fontFamily: K.mono, fontSize: 12, padding: "6px 10px", minHeight: 32, border: `1px solid ${K.line}`, borderRadius: 0, background: filter === f ? K.fg : K.bg, color: filter === f ? K.bg : K.fg, cursor: "pointer" }}
+      style={{ fontFamily: K.mono, fontSize: 12, padding: "6px 10px", minHeight: 32, border: `1px solid ${K.line}`, borderRadius: 6, background: filter === f ? K.fg : K.bg, color: filter === f ? K.bg : K.fg, cursor: "pointer" }}
     >
       {label}
     </button>
@@ -329,13 +329,13 @@ export default function LabClient() {
 
   return (
     <>
-      <Header sheet="sheet 02 / test lab" title="Test lab">
+      <Header sheet="luminatra / admin / test lab" title="Test lab">
         <label htmlFor="preset" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Load a preset</label>
         <select
           id="preset"
           value=""
           onChange={(e) => e.target.value && loadPreset(e.target.value)}
-          style={{ fontFamily: K.mono, fontSize: 13, color: K.fg, background: K.bg, border: `1px solid ${K.fg}`, borderRadius: 0, padding: "9px 10px", minHeight: 40, maxWidth: 280 }}
+          style={{ fontFamily: K.mono, fontSize: 13, color: K.fg, background: K.bg, border: `1px solid ${K.fg}`, borderRadius: 6, padding: "9px 10px", minHeight: 40, maxWidth: 280 }}
         >
           <option value="">load preset…</option>
           {saved.length > 0 && (
