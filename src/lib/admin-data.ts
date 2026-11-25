@@ -164,7 +164,7 @@ export async function spendingData() {
   const studentCost = sum(calls.filter((c) => c.step === "analysis" || c.step === "grading"));
   const perSubmission = submissions.length ? studentCost / submissions.length : null;
 
-  const steps = ["analysis", "grading", "lab", "eval", "suggestions"] as const;
+  const steps = ["analysis", "grading", "lab", "eval", "suggestions", "rules"] as const;
   const byStep = steps.map((step) => ({ step, cost: sum(calls.filter((c) => c.step === step)), calls: calls.filter((c) => c.step === step).length }));
 
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();

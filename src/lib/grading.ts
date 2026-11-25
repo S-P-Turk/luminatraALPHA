@@ -1,7 +1,7 @@
 import { db } from "@/src/prisma/db";
 import { gradeAnswers, type QuizResult, type ComprehensionResult } from "@/src/lib/quiz";
 import { withAiContext } from "@/src/lib/ai";
-import { scoreSubmission, SCORING_VERSION, type ScoreCard } from "@/src/lib/scoring";
+import { scoreSubmission, scoreLevers, SCORING_VERSION, REVIEW_THRESHOLD, type ScoreCard, type ScoreLever, type SignalKey } from "@/src/lib/scoring";
 
 // Stored in Submission.reportCard.
 export type ReportCard = {
@@ -85,22 +85,71 @@ export async function gradeIfNeeded(row: Row): Promise<{ reportCard: unknown; st
   return { reportCard, status };
 }
 
+export const MAX_REVISIONS = 2;
+
 /**
- * What a student is allowed to see of their own submission: the follow-up
- * notes, but never the score or the raw evidence behind it.
+ * What a student sees of their own submission, only ever after they've
+ * submitted: their exact follow-up priority, the points behind it, which
+ * paragraphs lean on AI, and what would change the score. The raw AI
+ * passages and the analyzer's severity label stay teacher-side.
  */
-export function forStudent<T extends { reportCard?: unknown; quiz?: unknown }>(submission: T): T {
+export function forStudent<T extends { reportCard?: unknown; quiz?: unknown; assignmentText?: string; revisions?: unknown }>(
+  submission: T
+): T & { result: StudentResult | null; revisionsUsed: number; maxRevisions: number } {
   const rc = (submission.reportCard ?? null) as ReportCard | null;
   const quiz = (submission.quiz ?? null) as (QuizResult & Record<string, unknown>) | null;
   let safeQuiz: unknown = quiz;
   if (quiz) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { ai_passages, policy_severity, ...rest } = quiz;
+    const { ai_passages, policy_severity, paragraphs, ...rest } = quiz;
     safeQuiz = rest;
   }
+  const card = rc?.scoreCard;
+  let result: StudentResult | null = null;
+  if (card) {
+    const text = submission.assignmentText ?? "";
+    const { levers, scoreIfAllFixed } = scoreLevers(card);
+    result = {
+      score: card.score,
+      threshold: REVIEW_THRESHOLD,
+      needsReview: card.needsReview,
+      signals: (Object.keys(card.signals) as SignalKey[]).map((k) => ({
+        key: k,
+        points: card.signals[k].points,
+        max: card.signals[k].max,
+        reason: card.signals[k].reason,
+        pending: !!card.signals[k].pending,
+      })),
+      paragraphs: card.reliance.paragraphs
+        .filter((p) => p.level !== "none")
+        .map((p) => ({
+          index: p.index,
+          level: p.level,
+          disclosed: p.disclosed,
+          note: p.note,
+          opening: text.slice(p.start, p.end).trim().split(/\s+/).slice(0, 12).join(" "),
+        })),
+      levers,
+      scoreIfAllFixed,
+    };
+  }
+  const revisionsUsed = Array.isArray(submission.revisions) ? submission.revisions.length : 0;
   return {
     ...submission,
     quiz: safeQuiz,
     reportCard: rc?.comprehension ? { comprehension: { passed: rc.comprehension.passed, note: rc.comprehension.note } } : null,
+    result,
+    revisionsUsed,
+    maxRevisions: MAX_REVISIONS,
   };
 }
+
+export type StudentResult = {
+  score: number;
+  threshold: number;
+  needsReview: boolean;
+  signals: { key: SignalKey; points: number; max: number; reason: string; pending: boolean }[];
+  paragraphs: { index: number; level: string; disclosed: boolean; note: string; opening: string }[];
+  levers: ScoreLever[];
+  scoreIfAllFixed: number;
+};

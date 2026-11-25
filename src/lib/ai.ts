@@ -17,7 +17,7 @@ async function getDb() {
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export type Step = "analysis" | "grading" | "suggestions" | "lab" | "eval";
+export type Step = "analysis" | "grading" | "suggestions" | "lab" | "eval" | "rules";
 
 // Estimated price per million tokens. Override with env vars if the model's
 // real pricing differs; the spending page shows these as estimates.

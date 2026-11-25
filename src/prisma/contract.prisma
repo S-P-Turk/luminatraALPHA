@@ -43,6 +43,9 @@ model Assignment {
   // Separate from `open`: students can submit while the quiz stays locked;
   // the comprehension quiz only appears once the teacher activates it.
   quizOpen     Boolean      @default(false)
+  // Plain-language AI rules for this assignment, generated from the syllabus
+  // and instructions. Null until first generated; cleared when either changes.
+  rulesCard    Json?
   submissions  Submission[]
   createdAt    DateTime     @default(now()) @onCreate(now())
 }
@@ -76,6 +79,9 @@ model Submission {
   quizAnswers     Json?
   reportCard      Json?
   studentResponse String?
+  // Earlier versions the student replaced by revising after seeing their
+  // score: [{ at, score, assignmentText, transcript }]. Kept for the teacher.
+  revisions       Json?
   status          String     @default("submitted")
   createdAt       DateTime   @default(now()) @onCreate(now())
   updatedAt       temporal.UpdatedAt

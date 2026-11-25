@@ -14,6 +14,7 @@ type Assignment = {
   open: boolean;
   quizOpen: boolean;
   createdAt: string;
+  rulesCard?: { allowed: string[]; notAllowed: string[]; disclose: string; gaps: string[] } | null;
 };
 
 type Suggestion = { title: string; instructions: string };
@@ -451,6 +452,24 @@ export default function AssignmentsClient() {
                   {a.instructions.slice(0, 100)}
                   {a.instructions.length > 100 ? "..." : ""}
                 </div>
+                {a.rulesCard && a.rulesCard.gaps.length > 0 && (
+                  <div style={{ fontSize: 13, color: "#B8822F", marginTop: 6 }}>
+                    <strong>Your syllabus doesn&apos;t say:</strong>
+                    <ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>
+                      {a.rulesCard.gaps.map((g) => <li key={g}>{g}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {a.rulesCard && (
+                  <details style={{ fontSize: 13, marginTop: 6 }}>
+                    <summary style={{ cursor: "pointer", color: colors.muted }}>Rules students see before they start</summary>
+                    <div style={{ marginTop: 4 }}>
+                      <div><strong>Allowed:</strong> {a.rulesCard.allowed.join("; ") || "nothing listed"}</div>
+                      <div><strong>Not allowed:</strong> {a.rulesCard.notAllowed.join("; ") || "nothing listed"}</div>
+                      {a.rulesCard.disclose && <div><strong>Disclosure:</strong> {a.rulesCard.disclose}</div>}
+                    </div>
+                  </details>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span

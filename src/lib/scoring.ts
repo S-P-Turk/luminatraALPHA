@@ -8,7 +8,7 @@
 
 import type { QuizResult, ComprehensionResult } from "./quiz";
 import { buildContributionMap, type ContributionMap } from "./contribution";
-import { computeReliance, type RelianceResult } from "./reliance";
+import { computeReliance, LEVEL_WEIGHT, type RelianceResult } from "./reliance";
 
 // v2: contribution map (copied / paraphrased / AI-assisted).
 // v3: AI reliance (ideas + wording, per paragraph) replaces copied-text share;
@@ -135,4 +135,29 @@ export function scoreSubmission(input: {
     contribution,
     reliance,
   };
+}
+
+// ---------------------------------------------------------------------------
+// What would change the score. Exact, not estimated: each lever re-runs the
+// same arithmetic with one paragraph's undisclosed reliance removed. Shown to
+// the student only after they submit, and to the teacher on the flag card.
+
+export type ScoreLever = { paragraph: number; level: string; scoreWithout: number; drop: number };
+
+export function scoreLevers(card: ScoreCard): { levers: ScoreLever[]; scoreIfAllFixed: number } {
+  const rel = card.reliance;
+  const total = rel.paragraphs.reduce((n, p) => n + p.words, 0) || 1;
+  const other =
+    card.signals.policy.value * WEIGHTS.policy + card.signals.comprehension.value * WEIGHTS.comprehension;
+  const scoreAt = (reliance: number) =>
+    Math.min(100, Math.round(Math.min(1, Math.max(0, reliance) / RELIANCE_FULL) * WEIGHTS.reliance + other));
+  const flagged = rel.paragraphs.filter((p) => p.level !== "none" && !p.disclosed);
+  const levers = flagged
+    .map((p) => {
+      const scoreWithout = scoreAt(rel.reliance - (LEVEL_WEIGHT[p.level] * p.words) / total);
+      return { paragraph: p.index, level: p.level, scoreWithout, drop: card.score - scoreWithout };
+    })
+    .filter((l) => l.drop > 0)
+    .sort((a, b) => b.drop - a.drop);
+  return { levers, scoreIfAllFixed: flagged.length ? scoreAt(0) : card.score };
 }

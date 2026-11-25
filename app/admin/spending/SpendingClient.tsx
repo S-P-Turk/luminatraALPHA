@@ -25,6 +25,7 @@ const STEP_LABEL: Record<string, string> = {
   lab: "test lab",
   eval: "test-set runs",
   suggestions: "assignment suggestions",
+  rules: "AI rules cards",
 };
 const STEP_COLOR: Record<string, string> = {
   analysis: K.sig,
@@ -32,6 +33,7 @@ const STEP_COLOR: Record<string, string> = {
   lab: K.clay,
   eval: "#B9A6E0",
   suggestions: K.mute,
+  rules: K.sage,
 };
 
 export default function SpendingClient() {

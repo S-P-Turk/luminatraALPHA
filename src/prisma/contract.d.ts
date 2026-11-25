@@ -18,7 +18,7 @@ import type {
 } from '@prisma/orm-postgres/contract-types';
 
 export type StorageHash =
-  StorageHashBase<'5fdfbc6d7ae43d6cca1f07aa49958627481cc9250e2f784f45c5da75b8193690'>;
+  StorageHashBase<'b7cc40e015832e637e397efd8001f3542abb2f6f895f0eb8b099a12a34841e47'>;
 export type ExecutionHash =
   ExecutionHashBase<'adf8dcd0bff9c62abe5dcc7114028c6c9e6428ba78e33e459e8072f315159fe6'>;
 export type ProfileHash =
@@ -330,6 +330,7 @@ export namespace Models {
     instructions: FieldOutputTypes['public']['Assignment']['instructions'];
     open: FieldOutputTypes['public']['Assignment']['open'];
     quizOpen: FieldOutputTypes['public']['Assignment']['quizOpen'];
+    rulesCard: FieldOutputTypes['public']['Assignment']['rulesCard'];
     title: FieldOutputTypes['public']['Assignment']['title'];
     class: public_Class;
     submissions: public_Submission[];
@@ -402,6 +403,7 @@ export namespace Models {
     quiz: FieldOutputTypes['public']['Submission']['quiz'];
     quizAnswers: FieldOutputTypes['public']['Submission']['quizAnswers'];
     reportCard: FieldOutputTypes['public']['Submission']['reportCard'];
+    revisions: FieldOutputTypes['public']['Submission']['revisions'];
     status: FieldOutputTypes['public']['Submission']['status'];
     studentEmail: FieldOutputTypes['public']['Submission']['studentEmail'];
     studentName: FieldOutputTypes['public']['Submission']['studentName'];
@@ -616,6 +618,12 @@ type ContractBase = Omit<
                     readonly kind: 'literal';
                     readonly value: DefaultLiteralValue<'pg/bool@1', false>;
                   };
+                  readonly many: false;
+                };
+                readonly rulesCard: {
+                  readonly dataType: 'pg/json';
+                  readonly codecId: 'pg/json@1';
+                  readonly nullable: true;
                   readonly many: false;
                 };
                 readonly title: {
@@ -1048,6 +1056,12 @@ type ContractBase = Omit<
                   readonly nullable: true;
                   readonly many: false;
                 };
+                readonly revisions: {
+                  readonly dataType: 'pg/json';
+                  readonly codecId: 'pg/json@1';
+                  readonly nullable: true;
+                  readonly many: false;
+                };
                 readonly status: {
                   readonly dataType: 'pg/text';
                   readonly codecId: 'pg/text@1';
@@ -1330,6 +1344,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
               };
+              readonly rulesCard: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
+              };
               readonly title: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -1370,6 +1388,7 @@ type ContractBase = Omit<
                 readonly instructions: { readonly column: 'instructions' };
                 readonly open: { readonly column: 'open' };
                 readonly quizOpen: { readonly column: 'quizOpen' };
+                readonly rulesCard: { readonly column: 'rulesCard' };
                 readonly title: { readonly column: 'title' };
               };
             };
@@ -1736,6 +1755,10 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
               };
+              readonly revisions: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/json@1' };
+              };
               readonly status: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -1803,6 +1826,7 @@ type ContractBase = Omit<
                 readonly quiz: { readonly column: 'quiz' };
                 readonly quizAnswers: { readonly column: 'quizAnswers' };
                 readonly reportCard: { readonly column: 'reportCard' };
+                readonly revisions: { readonly column: 'revisions' };
                 readonly status: { readonly column: 'status' };
                 readonly studentEmail: { readonly column: 'studentEmail' };
                 readonly studentName: { readonly column: 'studentName' };

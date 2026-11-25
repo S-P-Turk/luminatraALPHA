@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { forStudent } from "@/src/lib/grading";
+import { ensureRulesCard, rulesForStudent } from "@/src/lib/rules";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/student/assignments/[id]">) {
   const session = await getCurrentStudentSession();
@@ -43,8 +44,11 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/ass
       ? { ...submission, quiz: { ...(submission.quiz as object), quiz: [] } }
       : submission;
 
+  const rules = assignment.open ? rulesForStudent(await ensureRulesCard(assignment)) : null;
+
   return NextResponse.json({
     student: session,
+    rules,
     class: cls,
     assignment: {
       id: assignment.id,

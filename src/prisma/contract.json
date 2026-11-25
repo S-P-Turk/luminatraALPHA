@@ -251,6 +251,13 @@
                   "kind": "scalar"
                 }
               },
+              "rulesCard": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
               "title": {
                 "nullable": false,
                 "type": {
@@ -311,6 +318,9 @@
                 },
                 "quizOpen": {
                   "column": "quizOpen"
+                },
+                "rulesCard": {
+                  "column": "rulesCard"
                 },
                 "title": {
                   "column": "title"
@@ -910,6 +920,13 @@
                   "kind": "scalar"
                 }
               },
+              "revisions": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
               "status": {
                 "nullable": false,
                 "type": {
@@ -1015,6 +1032,9 @@
                 },
                 "reportCard": {
                   "column": "reportCard"
+                },
+                "revisions": {
+                  "column": "revisions"
                 },
                 "status": {
                   "column": "status"
@@ -1287,6 +1307,11 @@
                     "value": false
                   },
                   "nullable": false
+                },
+                "rulesCard": {
+                  "codecId": "pg/json@1",
+                  "dataType": "pg/json",
+                  "nullable": true
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -1771,6 +1796,11 @@
                   "dataType": "pg/json",
                   "nullable": true
                 },
+                "revisions": {
+                  "codecId": "pg/json@1",
+                  "dataType": "pg/json",
+                  "nullable": true
+                },
                 "status": {
                   "codecId": "pg/text@1",
                   "dataType": "pg/text",
@@ -1936,7 +1966,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5fdfbc6d7ae43d6cca1f07aa49958627481cc9250e2f784f45c5da75b8193690"
+    "storageHash": "b7cc40e015832e637e397efd8001f3542abb2f6f895f0eb8b099a12a34841e47"
   },
   "execution": {
     "executionHash": "adf8dcd0bff9c62abe5dcc7114028c6c9e6428ba78e33e459e8072f315159fe6",

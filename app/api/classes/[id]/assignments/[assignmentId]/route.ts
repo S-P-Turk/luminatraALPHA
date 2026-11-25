@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
+import { ensureRulesCard } from "@/src/lib/rules";
 
 export async function PATCH(
   request: Request,
@@ -46,6 +47,9 @@ export async function PATCH(
   if (typeof quizOpenRaw === "boolean") patch.quizOpen = quizOpenRaw;
 
   const updated = await db.orm.public.Assignment.where({ id: assignmentId }).update(patch);
+  // Opening an older assignment that never got a rules card writes one, so
+  // students always see the rules before they start.
+  const rulesCard = patch.open ? await ensureRulesCard(assignment) : assignment.rulesCard;
 
-  return NextResponse.json({ assignment: updated });
+  return NextResponse.json({ assignment: { ...updated, rulesCard } });
 }

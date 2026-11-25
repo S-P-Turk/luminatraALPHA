@@ -34,6 +34,7 @@ export async function GET() {
         "quizAnswers",
         "reportCard",
         "studentResponse",
+        "revisions",
         "status",
         "createdAt"
       )

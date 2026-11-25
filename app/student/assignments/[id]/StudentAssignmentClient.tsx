@@ -18,8 +18,32 @@ type Quiz = {
   quiz: QuizQuestion[];
 };
 
+type Result = {
+  score: number;
+  threshold: number;
+  needsReview: boolean;
+  signals: { key: "comprehension" | "reliance" | "policy"; points: number; max: number; reason: string; pending: boolean }[];
+  paragraphs: { index: number; level: string; disclosed: boolean; note: string; opening: string }[];
+  levers: { paragraph: number; level: string; scoreWithout: number; drop: number }[];
+  scoreIfAllFixed: number;
+};
+
+type Rules = { allowed: string[]; notAllowed: string[]; disclose: string };
+
+const SIGNAL_NAME = { comprehension: "Comprehension quiz", reliance: "AI reliance", policy: "Course AI rules" } as const;
+const LEVEL_NAME: Record<string, string> = {
+  ideas: "built on AI ideas",
+  heavy: "closely follows AI wording",
+  written: "written by AI",
+};
+
 type Submission = {
   id: number;
+  assignmentText: string;
+  transcript: string;
+  result: Result | null;
+  revisionsUsed: number;
+  maxRevisions: number;
   quiz: Quiz | null;
   quizAnswers: string[] | null;
   studentResponse: string | null;
@@ -29,6 +53,7 @@ type Submission = {
 
 type Detail = {
   class: { id: number; name: string };
+  rules: Rules | null;
   assignment: { id: number; title: string; instructions: string; open: boolean; quizOpen: boolean };
   submission: Submission | null;
 };
@@ -64,6 +89,7 @@ export default function StudentAssignmentClient() {
   const [assignmentText, setAssignmentText] = useState("");
   const [transcript, setTranscript] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [revising, setRevising] = useState(false);
 
   const [answers, setAnswers] = useState<string[]>([]);
   const [savingAnswers, setSavingAnswers] = useState(false);
@@ -114,8 +140,10 @@ export default function StudentAssignmentClient() {
         return;
       }
       // Reload so the quiz stays hidden unless the teacher has activated it.
+      const wasRevision = revising;
+      setRevising(false);
       await load();
-      toast("Submitted. Your teacher will start the quiz when they're ready.");
+      toast(wasRevision ? "Revision submitted. Your new score is below." : "Submitted. Your score is below.");
     } finally {
       setSubmitting(false);
     }
@@ -230,7 +258,9 @@ export default function StudentAssignmentClient() {
           </div>
         )}
 
-        {!submission && detail?.assignment.open && (
+        {detail?.rules && (!submission || revising) && detail.assignment.open && <RulesCard rules={detail.rules} />}
+
+        {(!submission || revising) && detail?.assignment.open && (
           <form
             onSubmit={handleSubmit}
             style={{
@@ -244,8 +274,9 @@ export default function StudentAssignmentClient() {
             }}
           >
             <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
-              Paste your submission and your AI conversation transcript (if you used one). Your teacher will
-              start a short comprehension quiz on it later.
+              {revising
+                ? `Edit your work or transcript and resubmit. Your teacher sees every version. ${submission ? submission.maxRevisions - submission.revisionsUsed - 1 : 0} revision(s) left after this one.`
+                : "Paste your work and your AI conversation (if you used one). You'll see your score right after you submit, and you can revise before the quiz starts."}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 600 }}>Your assignment</label>
@@ -286,13 +317,36 @@ export default function StudentAssignmentClient() {
                 alignSelf: "flex-start",
               }}
             >
-              {submitting && <Spinner />} {submitting ? "Submitting…" : "Submit"}
+              {submitting && <Spinner />} {submitting ? "Submitting…" : revising ? "Resubmit" : "Submit"}
             </button>
+            {revising && (
+              <button type="button" onClick={() => setRevising(false)} style={{ background: "none", border: "none", color: colors.muted, fontSize: 13, cursor: "pointer", alignSelf: "flex-start", padding: 0 }}>
+                Cancel, keep my current submission
+              </button>
+            )}
           </form>
         )}
 
+        {submission?.result && !revising && (
+          <ResultPanel
+            result={submission.result}
+            canRevise={
+              !!detail?.assignment.open &&
+              !detail.assignment.quizOpen &&
+              !submission.quizAnswers &&
+              submission.revisionsUsed < submission.maxRevisions
+            }
+            revisionsLeft={submission.maxRevisions - submission.revisionsUsed}
+            onRevise={() => {
+              setAssignmentText(submission.assignmentText);
+              setTranscript(submission.transcript);
+              setRevising(true);
+            }}
+          />
+        )}
+
         {/* Submitted, quiz not activated by the teacher yet */}
-        {submission && submission.quiz && !submission.quizAnswers && !detail?.assignment.quizOpen && (
+        {submission && !revising && submission.quiz && !submission.quizAnswers && !detail?.assignment.quizOpen && (
           <div
             style={{
               background: "#EFEDE6",
@@ -302,8 +356,8 @@ export default function StudentAssignmentClient() {
               fontSize: 14,
             }}
           >
-            <strong>Submitted.</strong> Your teacher will start the comprehension quiz — come back here when they
-            do.
+            <strong>Next:</strong> your teacher will start a 2-question quiz (one sentence each). Come back here when
+            they do.
           </div>
         )}
 
@@ -454,5 +508,143 @@ export default function StudentAssignmentClient() {
           )}
       </div>
     </main>
+  );
+}
+
+const box: React.CSSProperties = {
+  background: "#fff",
+  border: `1px solid ${colors.border}`,
+  borderRadius: 10,
+  padding: "16px 20px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+};
+const smallHead: React.CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: colors.muted, margin: 0 };
+
+function RulesCard({ rules }: { rules: Rules }) {
+  return (
+    <section aria-label="AI rules for this assignment" style={box}>
+      <h2 style={{ ...smallHead, color: colors.accent }}>AI rules for this assignment</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: colors.green, marginBottom: 4 }}>You can use AI for</div>
+          {rules.allowed.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>{rules.allowed.map((r) => <li key={r}>{r}</li>)}</ul>
+          ) : (
+            <div style={{ fontSize: 14, color: colors.muted }}>Nothing listed. Ask your teacher before using AI.</div>
+          )}
+        </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: colors.amber, marginBottom: 4 }}>Not allowed</div>
+          {rules.notAllowed.length ? (
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>{rules.notAllowed.map((r) => <li key={r}>{r}</li>)}</ul>
+          ) : (
+            <div style={{ fontSize: 14, color: colors.muted }}>Nothing listed.</div>
+          )}
+        </div>
+      </div>
+      {rules.disclose && (
+        <p style={{ margin: 0, fontSize: 14 }}>
+          <strong>Disclosing AI use:</strong> {rules.disclose}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ResultPanel({
+  result,
+  canRevise,
+  revisionsLeft,
+  onRevise,
+}: {
+  result: Result;
+  canRevise: boolean;
+  revisionsLeft: number;
+  onRevise: () => void;
+}) {
+  const over = result.score >= result.threshold || result.needsReview;
+  const quizPending = result.signals.some((s) => s.key === "comprehension" && s.pending);
+  return (
+    <section aria-label="Your result" style={{ ...box, borderColor: over ? colors.amber : colors.border }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "4px 14px" }}>
+        <span style={{ fontSize: 32, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: over ? colors.amber : colors.ink }}>
+          {result.score}
+          <span style={{ fontSize: 16, fontWeight: 500, color: colors.muted }}> / 100</span>
+        </span>
+        <span style={{ fontSize: 14, color: colors.muted }}>
+          follow-up priority. Your teacher reviews anything at {result.threshold} or above
+          {quizPending ? "; the quiz can still add up to 45 points." : "."}
+        </span>
+      </div>
+      <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
+        This isn&apos;t a grade and doesn&apos;t mean you did anything wrong. It decides whether your teacher takes a
+        closer look.
+      </p>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+        <tbody>
+          {result.signals.map((s) => (
+            <tr key={s.key} style={{ borderTop: `1px solid ${colors.border}` }}>
+              <td style={{ padding: "7px 0", fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "top" }}>{SIGNAL_NAME[s.key]}</td>
+              <td style={{ padding: "7px 12px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                {s.pending ? `– / ${s.max}` : `${s.points} / ${s.max}`}
+              </td>
+              <td style={{ padding: "7px 0", color: colors.muted, verticalAlign: "top" }}>
+                {s.pending ? "After the quiz." : s.reason || "Nothing to note."}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {result.paragraphs.length > 0 && (
+        <div>
+          <h3 style={smallHead}>Paragraphs that lean on AI</h3>
+          {result.paragraphs.map((p) => (
+            <div key={p.index} style={{ fontSize: 14, padding: "6px 0", borderTop: `1px solid ${colors.border}` }}>
+              <strong>¶{p.index}</strong> <span style={{ color: colors.muted }}>&ldquo;{p.opening}…&rdquo;</span>
+              <div>
+                {LEVEL_NAME[p.level] ?? p.level}
+                {p.disclosed ? " · disclosed, not counted" : ""}
+                {p.note ? <span style={{ color: colors.muted }}> · {p.note}</span> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {result.levers.length > 0 && (
+        <div>
+          <h3 style={smallHead}>What would change your score</h3>
+          {result.levers.map((l) => (
+            <div key={l.paragraph} style={{ fontSize: 14, padding: "5px 0" }}>
+              ¶{l.paragraph} in your own words, or disclosed if the rules allow that help:{" "}
+              <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+                {result.score} → {l.scoreWithout}
+              </strong>
+            </div>
+          ))}
+          {result.levers.length > 1 && (
+            <div style={{ fontSize: 14, padding: "5px 0", color: colors.muted }}>
+              All of them: {result.score} → {result.scoreIfAllFixed}
+            </div>
+          )}
+        </div>
+      )}
+
+      {canRevise ? (
+        <button
+          type="button"
+          onClick={onRevise}
+          style={{ alignSelf: "flex-start", background: colors.ink, color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+        >
+          Revise and resubmit ({revisionsLeft} left)
+        </button>
+      ) : (
+        revisionsLeft <= 0 && <div style={{ fontSize: 13, color: colors.muted }}>No revisions left.</div>
+      )}
+    </section>
   );
 }

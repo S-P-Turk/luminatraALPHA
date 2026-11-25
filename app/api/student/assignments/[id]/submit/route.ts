@@ -4,7 +4,7 @@ import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { generateQuiz } from "@/src/lib/quiz";
 import { scoreSubmission } from "@/src/lib/scoring";
 import { withAiContext } from "@/src/lib/ai";
-import { nextStatus, forStudent } from "@/src/lib/grading";
+import { nextStatus, forStudent, MAX_REVISIONS } from "@/src/lib/grading";
 
 export async function POST(request: Request, ctx: RouteContext<"/api/student/assignments/[id]/submit">) {
   const session = await getCurrentStudentSession();
@@ -36,11 +36,19 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
   const existing = await db.orm.public.Submission
     .where({ assignmentId: id, studentEmail: session.email })
     .first();
+  // A student may revise after seeing their score, while the assignment is
+  // open, before the quiz starts, and up to MAX_REVISIONS times. Each earlier
+  // version is kept so the teacher can see what changed.
+  const priorRevisions = Array.isArray(existing?.revisions) ? (existing.revisions as unknown[]) : [];
   if (existing) {
-    return NextResponse.json(
-      { error: "You've already submitted this assignment.", submission: forStudent(existing) },
-      { status: 409 }
-    );
+    const reason = assignment.quizOpen || existing.quizAnswers != null
+      ? "The quiz has started, so this submission can't be revised now."
+      : priorRevisions.length >= MAX_REVISIONS
+        ? `You've used all ${MAX_REVISIONS} revisions for this assignment.`
+        : null;
+    if (reason) {
+      return NextResponse.json({ error: reason, submission: forStudent(existing) }, { status: 409 });
+    }
   }
 
   const cls = await db.orm.public.Class.where({ id: assignment.classId }).first();
@@ -89,6 +97,25 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
 
   const scoreCard = scoreSubmission({ quiz, submissionText: assignmentText, transcript });
   const status = nextStatus("submitted", scoreCard, false);
+
+  if (existing) {
+    const prevScore = ((existing.reportCard ?? {}) as { scoreCard?: { score?: number } }).scoreCard?.score ?? null;
+    const revisions = [
+      ...priorRevisions,
+      { at: new Date(existing.updatedAt ?? existing.createdAt).toISOString(), score: prevScore, assignmentText: existing.assignmentText, transcript: existing.transcript },
+    ];
+    await db.orm.public.Submission.where({ id: existing.id }).update({
+      assignmentText,
+      transcript,
+      quiz,
+      reportCard: { scoreCard },
+      status,
+      studentResponse: null,
+      revisions: revisions as never,
+    });
+    const updated = await db.orm.public.Submission.where({ id: existing.id }).first();
+    return NextResponse.json({ submission: updated ? forStudent(updated) : null });
+  }
 
   const created = await db.orm.public.Submission.create({
     assignmentId: id,

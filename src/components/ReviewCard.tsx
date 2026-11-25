@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ScoreCard } from "@/src/lib/scoring";
+import { scoreLevers, type ScoreCard } from "@/src/lib/scoring";
 import { ContributionMapView } from "./ContributionMapView";
 import { toast } from "./Toaster";
 
@@ -41,6 +41,7 @@ export type ReviewSubmission = {
   } | null;
   status: string;
   createdAt: string;
+  revisions?: { at: string; score: number | null }[] | null;
 };
 
 // The separate reasons a submission can be flagged, in display order. Flags
@@ -85,6 +86,17 @@ export async function decideSubmission(
   const data = await res.json();
   return data.submission?.status ?? "cleared";
 }
+
+const quickBtn: React.CSSProperties = {
+  background: "#fff",
+  color: colors.ink,
+  border: `1px solid ${colors.cardBorder}`,
+  borderRadius: 6,
+  padding: "4px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+};
 
 export function ReviewCard({
   s,
@@ -179,6 +191,21 @@ export function ReviewCard({
         </div>
       </button>
 
+      {(s.revisions?.length ?? 0) > 0 && (
+        <div style={{ fontSize: 12, color: colors.muted, marginTop: 6 }}>
+          Revised {s.revisions!.length}× after seeing the score:{" "}
+          {s.revisions!.map((r) => (r.score == null ? "–" : r.score)).join(" → ")} → {card?.score ?? "–"}
+        </div>
+      )}
+
+      {!open && s.status === "flagged" && (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button onClick={() => decide("cleared")} disabled={busy} style={quickBtn}>Clear</button>
+          <button onClick={() => decide("follow_up")} disabled={busy} style={quickBtn}>Follow up</button>
+          <button onClick={() => setOpen(true)} style={{ ...quickBtn, border: "none", color: colors.accent }}>Details</button>
+        </div>
+      )}
+
       {open && (
         <div
           style={{
@@ -222,6 +249,14 @@ export function ReviewCard({
                   </div>
                 );
               })}
+              {(() => {
+                const top = scoreLevers(card).levers[0];
+                return top ? (
+                  <div style={{ marginTop: 8, color: colors.muted }}>
+                    Biggest driver: ¶{top.paragraph}. Without it the score would be {top.scoreWithout}.
+                  </div>
+                ) : null;
+              })()}
             </div>
           ) : (
             reasons.map((f) => (

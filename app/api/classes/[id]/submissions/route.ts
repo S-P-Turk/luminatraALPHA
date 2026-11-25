@@ -35,6 +35,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id
       "quizAnswers",
       "reportCard",
       "studentResponse",
+      "revisions",
       "status",
       "createdAt",
       "updatedAt"

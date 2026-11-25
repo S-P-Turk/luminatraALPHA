@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
+import { ensureRulesCard } from "@/src/lib/rules";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/classes/[id]/assignments">) {
   const teacher = await getCurrentTeacher();
@@ -75,5 +76,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/classes/[id
     open: false,
   });
 
-  return NextResponse.json({ assignment: created }, { status: 201 });
+  // Write the students' rules card now so the teacher sees any gaps in the
+  // policy before the assignment opens. A failure here is retried later.
+  const rulesCard = await ensureRulesCard(created);
+
+  return NextResponse.json({ assignment: { ...created, rulesCard } }, { status: 201 });
 }
