@@ -7,6 +7,7 @@ import { generateQuiz } from "./quiz";
 import { scoreSubmission } from "./scoring";
 import { withAiContext } from "./ai";
 import { nextStatus } from "./grading";
+import { redact, restore } from "./redact";
 
 export const ANALYZING = "analyzing";
 export const ANALYSIS_FAILED = "analysis_failed";
@@ -24,8 +25,13 @@ export async function analyzeSubmission(submissionId: number): Promise<void> {
   const policy = `COURSE SYLLABUS / AI-USE POLICY:\n${cls.syllabusText}\n\n---\n\nTHIS ASSIGNMENT'S INSTRUCTIONS:\n${assignment.title}\n${assignment.instructions}`;
 
   try {
-    const quiz = await withAiContext({ classId: assignment.classId }, () =>
-      generateQuiz(row.transcript, policy, row.assignmentText)
+    // The student's name and email never leave our servers.
+    const who = { name: row.studentName, email: row.studentEmail };
+    const quiz = restore(
+      await withAiContext({ classId: assignment.classId }, () =>
+        generateQuiz(redact(row.transcript, who), policy, redact(row.assignmentText, who))
+      ),
+      who
     );
     const scoreCard = scoreSubmission({ quiz, submissionText: row.assignmentText, transcript: row.transcript });
     await db.orm.public.Submission.where({ id: submissionId }).update({

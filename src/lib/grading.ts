@@ -1,5 +1,6 @@
 import { db } from "@/src/prisma/db";
 import { gradeAnswers, type QuizResult, type ComprehensionResult } from "@/src/lib/quiz";
+import { redact } from "@/src/lib/redact";
 import { withAiContext } from "@/src/lib/ai";
 import { scoreSubmission, scoreLevers, SCORING_VERSION, REVIEW_THRESHOLD, type ScoreCard, type ScoreLever, type SignalKey } from "@/src/lib/scoring";
 
@@ -22,6 +23,8 @@ type Row = {
   quizAnswers: unknown;
   reportCard: unknown;
   status: string;
+  studentName?: string | null;
+  studentEmail?: string | null;
 };
 
 /** Status after scoring, without overriding a teacher's decision unless there's new evidence. */
@@ -49,13 +52,14 @@ export async function gradeIfNeeded(row: Row): Promise<{ reportCard: unknown; st
   let newlyGraded = false;
 
   if (!comprehension && Array.isArray(row.quizAnswers)) {
+    const who = { name: row.studentName, email: row.studentEmail };
     try {
       comprehension = await withAiContext({ classId: row.classId ?? null }, () =>
         gradeAnswers({
-          assignmentText: row.assignmentText,
-          transcript: row.transcript,
+          assignmentText: redact(row.assignmentText, who),
+          transcript: redact(row.transcript, who),
           quiz: row.quiz as QuizResult,
-          answers: row.quizAnswers as string[],
+          answers: (row.quizAnswers as string[]).map((a) => redact(a, who)),
         })
       );
       newlyGraded = true;

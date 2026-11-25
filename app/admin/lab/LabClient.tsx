@@ -1,5 +1,6 @@
 "use client";
 
+import { POLICY_CASES } from "@/src/lib/eval/policies";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { K, Cell, Btn, Header, Grid, th, td, tdMono, Loading, usd, Bar } from "../ui";
 import { toast } from "@/src/components/Toaster";
@@ -96,6 +97,16 @@ export default function LabClient() {
   const looksLabeled = /^\s*(User|Assistant|You|ChatGPT|Claude|AI)\s*:/im.test(transcript);
 
   function loadPreset(id: string) {
+    const pol = POLICY_CASES.find((p) => p.id === id);
+    if (pol) {
+      // Syllabus only: paste a transcript and submission to test against it.
+      setSyllabus(`${pol.policy}\n\n${pol.assignment.title}\n${pol.assignment.instructions}`);
+      setAnalysis(null);
+      setLabError(null);
+      setSaveName(`${pol.discipline}: `);
+      toast(`Loaded ${pol.course} (${pol.tier}). ${pol.quirk ?? ""}`, "info");
+      return;
+    }
     const c = rows.find((r) => r.info.id === id)?.info;
     if (!c) return;
     setSyllabus([c.syllabus, c.instructions].filter(Boolean).join("\n\n"));
@@ -343,6 +354,9 @@ export default function LabClient() {
               {saved.map((r) => <option key={r.info.id} value={r.info.id}>{r.info.id} · {r.info.scenario}</option>)}
             </optgroup>
           )}
+          <optgroup label={`Syllabus library (${POLICY_CASES.length}, syllabus only)`}>
+            {POLICY_CASES.map((p) => <option key={p.id} value={p.id}>{p.discipline} · {p.tier} · {p.course}</option>)}
+          </optgroup>
           <optgroup label="Built-in test set">
             {builtIn.map((r) => <option key={r.info.id} value={r.info.id}>{r.info.id} · {r.info.scenario}</option>)}
           </optgroup>
