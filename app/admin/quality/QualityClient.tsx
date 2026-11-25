@@ -50,7 +50,7 @@ export default function QualityClient() {
   if (!data) {
     return (
       <>
-        <Header sheet="luminatra / admin / model quality" title="Model quality" />
+        <Header sheet="sheet 04 / quality" title="Model quality" />
         <Loading />
       </>
     );
@@ -71,31 +71,31 @@ export default function QualityClient() {
 
   return (
     <>
-      <Header sheet={`luminatra / admin / model quality · scoring ${data.version}`} title="Model quality">
+      <Header sheet={`sheet 04 / quality — scoring ${data.version}`} title="Model quality">
         <Btn onClick={() => { setData(null); void load(); }}>refresh</Btn>
         <LinkBtn href="/admin/lab#test-set" primary>run test set</LinkBtn>
       </Header>
 
       <Grid min={220}>
-        <Cell label="review decisions" refId="A1">
+        <Cell label="test set: correct review decisions" refId="A1">
           <Big color={l && l.correct === l.judged ? K.sage : undefined}>{l ? `${l.correct}/${l.judged}` : "—"}</Big>
           <Sub>{l ? `last run · ${l.version} · ${timeAgo(l.createdAt)}` : "no saved runs yet"}</Sub>
         </Cell>
-        <Cell label="reliance labels" refId="A2">
+        <Cell label="test set: correct AI-reliance labels" refId="A2">
           <Big color={l && l.relianceCorrect === l.relianceJudged ? K.sage : undefined}>{l ? `${l.relianceCorrect}/${l.relianceJudged}` : "—"}</Big>
           <Sub>{l ? `${l.errors} errors · ${l.borderline} borderline` : "run the test set"}</Sub>
         </Cell>
-        <Cell label="teacher agreement" refId="A3">
+        <Cell label="teachers agreed with the flag" refId="A3">
           <Big>{data.agreement ? `${pctOf(data.agreement.followed, data.agreement.total)}%` : "—"}</Big>
           <Sub>{data.agreement ? `${data.agreement.followed} of ${data.agreement.total} flags followed up` : "appears after teachers review flags"}</Sub>
         </Cell>
-        <Cell label="scoring" refId="A4">
+        <Cell label="live scoring version" refId="A4">
           <Big color={data.confirmed ? K.sage : K.sig}>{data.version}</Big>
           <Sub color={data.confirmed ? K.sage : K.sig}>{data.confirmed ? "confirmed by a test-set run" : "unconfirmed · run the test set"}</Sub>
         </Cell>
       </Grid>
 
-      <Cell label="test-set history" refId="B1">
+      <Cell label="test-set runs over time" refId="B1">
         <div style={{ display: "flex", gap: 18, fontFamily: K.mono, fontSize: 11, color: K.mute, marginBottom: 14 }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, background: K.fg }} />decisions</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, background: K.sig }} />reliance labels</span>
@@ -122,11 +122,11 @@ export default function QualityClient() {
       </Cell>
 
       <Grid min={420}>
-        <Cell label="score distribution" refId="C1">
+        <Cell label="follow-up priority across real submissions" refId="C1">
           {data.scored === 0 ? (
             <div style={{ fontFamily: K.mono, fontSize: 13, color: K.mute }}>no scored submissions yet</div>
           ) : (
-            <svg viewBox="0 0 520 190" width="100%" height="190" role="img" aria-label={`Follow-up priority across ${data.scored} submissions; review line at ${data.threshold}`} style={{ display: "block" }}>
+            <svg viewBox="0 0 520 190" width="100%" height="150" role="img" aria-label={`Follow-up priority across ${data.scored} submissions; review line at ${data.threshold}`} style={{ display: "block" }}>
               <line x1="10" x2="520" y1="160" y2="160" stroke={K.line} />
               {data.bins.map((b, i) => {
                 const h = (b.count / maxBin) * 130;
@@ -144,7 +144,7 @@ export default function QualityClient() {
           )}
           <Sub>{data.scored} scored submissions</Sub>
         </Cell>
-        <Cell label="how the score is built" refId="C2">
+        <Cell label="score formula" refId="C2">
           <p style={{ margin: "0 0 10px", fontSize: 13, color: K.mute, lineHeight: 1.5 }}>Claude proposes evidence. Luminatra&apos;s own rules decide what counts.</p>
           {([
             ["comprehension", data.weights.comprehension, K.fg],

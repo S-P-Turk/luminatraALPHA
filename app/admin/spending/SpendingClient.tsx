@@ -72,7 +72,7 @@ export default function SpendingClient() {
   if (!data) {
     return (
       <>
-        <Header sheet="luminatra / admin / api spending" title="API spending" />
+        <Header sheet="sheet 03 / spending" title="API spending" />
         <Loading />
       </>
     );
@@ -87,22 +87,21 @@ export default function SpendingClient() {
 
   return (
     <>
-      <Header sheet={`luminatra / admin / api spending · ${data.month}`} title="API spending">
+      <Header sheet={`sheet 03 / spending — ${data.month}`} title="API spending">
         <Btn onClick={() => { setData(null); void load(); }}>refresh</Btn>
         <LinkBtn href="/api/admin/spending/csv">Calls CSV</LinkBtn>
       </Header>
 
       <Grid min={220}>
-        <Cell label="today" refId="A1"><Big>{usd(data.today)}</Big><Sub>since midnight UTC</Sub></Cell>
-        <Cell label="last 7 days" refId="A2"><Big>{usd(data.week)}</Big><Sub>{data.calls} calls this month</Sub></Cell>
-        <Cell label="this month" refId="A3"><Big>{usd(data.total)}</Big><Sub>of {usd(b)} budget</Sub></Cell>
-        <Cell label="per submission" refId="A4">
+        <Cell label="spent today (UTC)" refId="A1"><Big>{usd(data.today)}</Big></Cell>
+        <Cell label="spent last 7 days" refId="A2"><Big>{usd(data.week)}</Big><Sub>{data.calls} calls this month</Sub></Cell>
+        <Cell label="avg cost per student submission" refId="A3">
           <Big color={K.sig}>{data.perSubmission == null ? "—" : usd(data.perSubmission, 3)}</Big>
           <Sub>analysis + grading ÷ submissions</Sub>
         </Cell>
       </Grid>
 
-      <Cell label="monthly budget" refId="B1">
+      <Cell label="monthly Claude API budget" refId="B1">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
           <div style={{ fontFamily: K.mono, fontSize: 28 }}>
             {usd(data.total)} <span style={{ color: K.mute, fontSize: 16 }}>/ {usd(b)}</span>
@@ -147,11 +146,11 @@ export default function SpendingClient() {
           <form onSubmit={saveBudget} style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 12, marginTop: 14 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: K.mono, fontSize: 11, color: K.mute }}>
               monthly budget ($)
-              <input type="number" min="0" step="1" required value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} style={{ width: 140, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 6, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
+              <input type="number" min="0" step="1" required value={budgetInput} onChange={(e) => setBudgetInput(e.target.value)} style={{ width: 140, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 0, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: K.mono, fontSize: 11, color: K.mute }}>
               alert at (%)
-              <input type="number" min="1" max="100" step="1" required value={alertInput} onChange={(e) => setAlertInput(e.target.value)} style={{ width: 110, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 6, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
+              <input type="number" min="1" max="100" step="1" required value={alertInput} onChange={(e) => setAlertInput(e.target.value)} style={{ width: 110, background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 0, padding: "9px 10px", fontFamily: K.mono, fontSize: 14 }} />
             </label>
             <Btn type="submit" primary disabled={saving}>{saving ? "saving…" : "save"}</Btn>
           </form>
@@ -159,7 +158,7 @@ export default function SpendingClient() {
       </Cell>
 
       <Grid min={420}>
-        <Cell label="where it went" refId="C1">
+        <Cell label="cost by pipeline step" refId="C1">
           {stepTotal === 0 ? (
             <div style={{ fontFamily: K.mono, fontSize: 13, color: K.mute }}>no spend yet this month</div>
           ) : (
@@ -183,8 +182,8 @@ export default function SpendingClient() {
             </>
           )}
         </Cell>
-        <Cell label="daily spend" refId="C2">
-          <svg viewBox="0 0 520 200" width="100%" height="200" role="img" aria-label={`Daily spend this month, highest day ${usd(maxDay)}`} style={{ display: "block" }}>
+        <Cell label="cost per day this month" refId="C2">
+          <svg viewBox="0 0 520 200" width="100%" height="150" role="img" aria-label={`Daily spend this month, highest day ${usd(maxDay)}`} style={{ display: "block" }}>
             <line x1="40" x2="520" y1="170" y2="170" stroke={K.line} />
             <line x1="40" x2="520" y1="20" y2="20" stroke={K.grid} />
             <text x="34" y="24" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>{usd(maxDay)}</text>
@@ -204,7 +203,7 @@ export default function SpendingClient() {
         </Cell>
       </Grid>
 
-      <Cell label="by class" refId="D1">
+      <Cell label="cost by class" refId="D1">
         {data.byClass.length === 0 ? (
           <div style={{ fontFamily: K.mono, fontSize: 13, color: K.mute }}>nothing yet this month</div>
         ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { K, Cell, Big, Sub, Spark, Btn, LinkBtn, Header, Grid, th, td, tdMono, Loading, timeAgo, usd } from "./ui";
+import { K, Cell, Btn, LinkBtn, Header, Grid, th, td, tdMono, Loading, timeAgo, usd } from "./ui";
 import { toast } from "@/src/components/Toaster";
 
 type Overview = {
@@ -69,7 +69,7 @@ export default function OverviewClient() {
 
   return (
     <>
-      <Header sheet="luminatra / admin / overview" title="Overview">
+      <Header sheet="sheet 01 / overview" title="Overview">
         <Btn onClick={() => { setData(null); void load(); }}>refresh</Btn>
         <LinkBtn href="/api/admin/report">Export CSV</LinkBtn>
       </Header>
@@ -79,70 +79,21 @@ export default function OverviewClient() {
 
       {data && s && (
         <>
-          <Grid min={220}>
-            <Cell label="teachers" refId="A1">
-              <Big>{s.teachers}</Big>
-              <Sub>{s.classes} classes · {s.openAssignments} assignments open</Sub>
-            </Cell>
-            <Cell label="students" refId="A2">
-              <Big>{s.students}</Big>
-              <Sub>accounts + class joins</Sub>
-            </Cell>
-            <Cell label="submissions" refId="A3">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 10 }}>
-                <Big>{s.submissions}</Big>
-                <Spark values={data.days.map((d) => d.submitted)} />
-              </div>
-              <Sub color={change != null && change >= 0 ? K.sage : undefined}>
-                {s.submissionsThisMonth} this month{change != null ? ` · ${change >= 0 ? "+" : ""}${Math.round(change * 100)}% vs last` : ""}
-              </Sub>
-            </Cell>
-            <Cell label="awaiting review" refId="A4">
-              <Big color={s.awaitingReview ? K.sig : undefined}>{s.awaitingReview}</Big>
-              <Sub color={s.oldestFlaggedDays && s.oldestFlaggedDays >= 2 ? K.clay : undefined}>
-                {s.awaitingReview ? `oldest ${s.oldestFlaggedDays} d` : "nothing waiting"}
-              </Sub>
-            </Cell>
-          </Grid>
-
-          <Cell label="submissions per day · last 30 days" refId="B1">
-            <div style={{ display: "flex", gap: 18, fontFamily: K.mono, fontSize: 11, color: K.mute, marginBottom: 12 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, background: K.mute }} />submitted</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, background: K.sig }} />sent to review</span>
-            </div>
-            <svg viewBox="0 0 1000 200" width="100%" height="200" role="img" aria-label={`Submissions per day for 30 days; ${s.submissionsThisMonth} this month`} style={{ display: "block" }}>
-              {[0.25, 0.5, 0.75].map((f) => (
-                <line key={f} x1="30" x2="1000" y1={170 - f * 150} y2={170 - f * 150} stroke={K.grid} />
-              ))}
-              <line x1="30" x2="1000" y1="170" y2="170" stroke={K.line} />
-              <text x="24" y="24" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>{maxDay}</text>
-              <text x="24" y="174" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>0</text>
-              {data.days.map((d, i) => {
-                const x = 40 + i * 32;
-                const h = (d.submitted / maxDay) * 150;
-                const r = (d.review / maxDay) * 150;
-                return (
-                  <g key={d.day}>
-                    <rect x={x} y={170 - h} width="16" height={h} fill={K.mute}><title>{`${d.day}: ${d.submitted} submitted, ${d.review} to review`}</title></rect>
-                    {r > 0 && <rect x={x} y={170 - r} width="16" height={r} fill={K.sig} />}
-                  </g>
-                );
-              })}
-              <text x="40" y="192" fontFamily="monospace" fontSize="11" fill={K.mute}>{data.days[0]?.day}</text>
-              <text x="1000" y="192" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>today</text>
-            </svg>
-          </Cell>
-
-          <Grid min={420}>
-            <Cell label="needs attention" refId="C1">
+          <Grid min={360}>
+            <Cell label={`flagged submissions waiting on a teacher · ${s.awaitingReview}`} refId="A1">
+              {s.awaitingReview > 0 && (
+                <div style={{ fontFamily: K.mono, fontSize: 12, color: s.oldestFlaggedDays && s.oldestFlaggedDays >= 2 ? K.clay : K.mute, marginBottom: 6 }}>
+                  oldest has waited {s.oldestFlaggedDays} d
+                </div>
+              )}
               {data.attention.length === 0 ? (
-                <div style={{ fontFamily: K.mono, fontSize: 13, color: K.sage }}>all clear</div>
+                <div style={{ fontFamily: K.mono, fontSize: 12, color: K.sage }}>nothing for you to do</div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {data.attention.map((a, i) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "64px minmax(0, 1fr)", gap: 12, padding: "10px 0", borderTop: i ? `1px solid ${K.line}` : "none" }}>
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", gap: 8, padding: "6px 0", borderTop: i ? `1px solid ${K.line}` : "none" }}>
                       <span style={{ fontFamily: K.mono, fontSize: 11, color: a.kind === "warn" ? K.clay : a.kind === "todo" ? K.sig : K.mute }}>{a.kind}</span>
-                      <span style={{ fontSize: 14, lineHeight: 1.5, color: K.mute }}>
+                      <span style={{ fontSize: 13, lineHeight: 1.45, color: K.mute }}>
                         <span style={{ color: K.fg }}>{a.title}</span> {a.text}{" "}
                         {a.href && <a href={a.href} style={{ color: K.sig, fontFamily: K.mono, fontSize: 12 }}>{a.link} ▸</a>}
                       </span>
@@ -151,16 +102,16 @@ export default function OverviewClient() {
                 </div>
               )}
             </Cell>
-            <Cell label="system health" refId="C2">
+            <Cell label="analysis pipeline" refId="A2">
               {[
-                ["ai service", data.health.aiStatus, data.health.aiStatus === "operational" ? K.sage : data.health.aiStatus === "no calls yet" ? K.mute : K.clay],
-                ["errors · 24h", `${Math.round(data.health.errorRate24h * 100)}% of ${data.health.calls24h} calls`, data.health.errorRate24h > 0.05 ? K.clay : K.fg],
-                ["avg analysis", data.health.avgAnalysisMs ? `${(data.health.avgAnalysisMs / 1000).toFixed(1)} s` : "—", K.fg],
-                ["scoring", `${data.health.scoringVersion} · ${data.health.confirmed ? "confirmed" : "unconfirmed"}`, data.health.confirmed ? K.sage : K.sig],
-                ["deploy", data.health.deploy, K.fg],
-                ["budget", `${usd(data.budget.spent)} / ${usd(data.budget.budget)}`, K.fg],
+                ["Claude API", data.health.aiStatus, data.health.aiStatus === "operational" ? K.sage : data.health.aiStatus === "no calls yet" ? K.mute : K.clay],
+                ["failed calls, 24h", `${Math.round(data.health.errorRate24h * 100)}% of ${data.health.calls24h}`, data.health.errorRate24h > 0.05 ? K.clay : K.fg],
+                ["time per analysis", data.health.avgAnalysisMs ? `${(data.health.avgAnalysisMs / 1000).toFixed(1)} s avg` : "—", K.fg],
+                ["scoring version", `${data.health.scoringVersion} · ${data.health.confirmed ? "test set passed" : "not re-tested"}`, data.health.confirmed ? K.sage : K.sig],
+                ["live commit", data.health.deploy, K.fg],
+                ["API spend this month", `${usd(data.budget.spent)} of ${usd(data.budget.budget)}`, K.fg],
               ].map(([k, v, c], i) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderTop: i ? `1px solid ${K.line}` : "none", fontSize: 13 }}>
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "5px 0", borderTop: i ? `1px solid ${K.line}` : "none", fontSize: 12 }}>
                   <span style={{ fontFamily: K.mono, color: K.mute }}>{k}</span>
                   <span style={{ fontFamily: K.mono, color: c }}>{v}</span>
                 </div>
@@ -168,13 +119,46 @@ export default function OverviewClient() {
             </Cell>
           </Grid>
 
+          <Cell label="usage" refId="B1">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 20px", fontFamily: K.mono, fontSize: 12, color: K.mute, marginBottom: 8 }}>
+              <span><span style={{ color: K.fg }}>{s.teachers}</span> teachers</span>
+              <span><span style={{ color: K.fg }}>{s.classes}</span> classes</span>
+              <span><span style={{ color: K.fg }}>{s.openAssignments}</span> open assignments</span>
+              <span><span style={{ color: K.fg }}>{s.students}</span> students</span>
+              <span><span style={{ color: K.fg }}>{s.submissions}</span> submissions total, {s.submissionsThisMonth} this month{change != null ? ` (${change >= 0 ? "+" : ""}${Math.round(change * 100)}% vs last month)` : ""}</span>
+            </div>
+            <div style={{ display: "flex", gap: 14, fontFamily: K.mono, fontSize: 11, color: K.mute, marginBottom: 4 }}>
+              <span>submissions per day, last 30 days:</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, background: K.mute }} />submitted</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 8, height: 8, background: K.sig }} />flagged for review</span>
+            </div>
+            <svg viewBox="0 0 1000 120" width="100%" height="110" role="img" aria-label={`Submissions per day for 30 days; ${s.submissionsThisMonth} this month`} style={{ display: "block" }}>
+              <line x1="30" x2="1000" y1="100" y2="100" stroke={K.line} />
+              <text x="24" y="14" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>{maxDay}</text>
+              <text x="24" y="104" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>0</text>
+              {data.days.map((d, i) => {
+                const x = 40 + i * 32;
+                const h = (d.submitted / maxDay) * 90;
+                const r = (d.review / maxDay) * 90;
+                return (
+                  <g key={d.day}>
+                    <rect x={x} y={100 - h} width="16" height={h} fill={K.mute}><title>{`${d.day}: ${d.submitted} submitted, ${d.review} flagged`}</title></rect>
+                    {r > 0 && <rect x={x} y={100 - r} width="16" height={r} fill={K.sig} />}
+                  </g>
+                );
+              })}
+              <text x="40" y="117" fontFamily="monospace" fontSize="11" fill={K.mute}>{data.days[0]?.day}</text>
+              <text x="1000" y="117" textAnchor="end" fontFamily="monospace" fontSize="11" fill={K.mute}>today</text>
+            </svg>
+          </Cell>
+
           <Grid min={420}>
-            <Cell label="recent activity" refId="D1">
+            <Cell label="latest teacher and student actions" refId="C1">
               {data.activity.length === 0 ? (
                 <div style={{ fontFamily: K.mono, fontSize: 13, color: K.mute }}>no activity yet</div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse" }}>
+                  <table style={{ width: "100%", minWidth: 460, borderCollapse: "collapse" }}>
                     <thead>
                       <tr><th scope="col" style={th}>when</th><th scope="col" style={th}>who</th><th scope="col" style={th}>what</th><th scope="col" style={th}>class</th></tr>
                     </thead>
@@ -192,9 +176,9 @@ export default function OverviewClient() {
                 </div>
               )}
             </Cell>
-            <Cell label="accounts · reset a password" refId="D2">
+            <Cell label="reset an account password" refId="C2">
               <form onSubmit={resetPassword} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <label htmlFor="reset-email" style={{ fontSize: 13, color: K.mute, lineHeight: 1.5 }}>
+                <label htmlFor="reset-email" style={{ fontSize: 12, color: K.mute, lineHeight: 1.45 }}>
                   Any teacher or student. They create a new password at their next sign-in. An accidental empty teacher
                   account on a student&apos;s email is removed.
                 </label>
@@ -206,7 +190,7 @@ export default function OverviewClient() {
                     placeholder="email@school.edu"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    style={{ flex: "1 1 220px", background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 6, padding: "9px 12px", fontFamily: K.mono, fontSize: 13 }}
+                    style={{ flex: "1 1 220px", background: K.bg, color: K.fg, border: `1px solid ${K.line}`, borderRadius: 0, padding: "5px 8px", fontFamily: K.mono, fontSize: 12 }}
                   />
                   <Btn type="submit" disabled={resetting || !resetEmail}>{resetting ? "resetting…" : "reset"}</Btn>
                 </div>
