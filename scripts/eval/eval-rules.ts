@@ -136,7 +136,11 @@ async function main() {
     }
   }
 
-  const total = Object.values(tally).reduce((a, b) => a + b, 0) || 1;
+  const total = Object.values(tally).reduce((a, b) => a + b, 0);
+  if (total === 0) {
+    console.log("\nNo results: every policy errored. Check the API key and connection.");
+    return;
+  }
   const pct = (n: number) => `${Math.round((n / total) * 100)}%`;
   console.log(`\n${total} labeled uses across ${cases.length} policies`);
   console.log(`  exact match      ${tally.match} (${pct(tally.match)})`);
