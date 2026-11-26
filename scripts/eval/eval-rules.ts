@@ -18,59 +18,11 @@
 
 import "./env";
 import { readFileSync, writeFileSync } from "node:fs";
-import type Anthropic from "@anthropic-ai/sdk";
-import { callClaude } from "../../src/lib/ai";
-import { generateRulesCard, type RulesCard } from "../../src/lib/rules";
-import { POLICY_CASES, USES, type PolicyCase, type Stance, type Use } from "../../src/lib/eval/policies";
+import { POLICY_CASES, type PolicyCase } from "../../src/lib/eval/policies";
+import { checkPolicy, stancesFrom } from "../../src/lib/eval/rules-check";
 import { REAL_POLICY_CASES } from "../../src/lib/eval/policies-real";
 
 const IMPORTED = "src/lib/eval/policies-imported.json";
-const STANCES: Stance[] = ["allowed", "with_disclosure", "not_allowed", "unclear"];
-
-const TOOL: Anthropic.Tool = {
-  name: "submit_stances",
-  description: "Report what the text permits for each use.",
-  input_schema: {
-    type: "object",
-    properties: Object.fromEntries(USES.map((u) => [u, { type: "string", enum: STANCES }])),
-    required: USES,
-  },
-};
-
-const USE_TEXT: Record<Use, string> = {
-  brainstorm: "brainstorm: using AI to generate ideas, topics, outlines or counterarguments",
-  grammar: "grammar: using an AI chatbot to fix grammar or spelling in the student's own text",
-  paraphrase: "paraphrase: using AI to reword or polish sentences the student wrote",
-  draft: "draft: submitting text (sentences or paragraphs) that an AI wrote",
-  research: "research: using AI to explain concepts, look up facts or find sources",
-  code: "code: using AI to write or fix code",
-};
-
-async function stancesFrom(label: string, text: string): Promise<Record<Use, Stance>> {
-  const msg = await callClaude("eval", {
-    model: "claude-sonnet-5",
-    max_tokens: 300,
-    system: `Read the ${label} and report, for each use below, what it permits: allowed (no conditions), with_disclosure (allowed if disclosed/cited), not_allowed, or unclear (the text doesn't settle it, or lists it as an open question). Judge only from the text; do not apply common sense about what a teacher probably means.\n\n${USES.map((u) => USE_TEXT[u]).join("\n")}`,
-    tools: [TOOL],
-    tool_choice: { type: "tool", name: "submit_stances" },
-    messages: [{ role: "user", content: text }],
-  });
-  const block = msg.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new Error("no stances returned");
-  return block.input as Record<Use, Stance>;
-}
-
-const cardText = (c: RulesCard) =>
-  `ALLOWED:\n${c.allowed.map((x) => `- ${x}`).join("\n") || "(none listed)"}\n\nNOT ALLOWED:\n${c.notAllowed.map((x) => `- ${x}`).join("\n") || "(none listed)"}\n\nDISCLOSURE: ${c.disclose || "(not mentioned)"}\n\nOPEN QUESTIONS THE POLICY DOESN'T ANSWER:\n${c.gaps.map((x) => `- ${x}`).join("\n") || "(none)"}`;
-
-// with_disclosure vs allowed is a near miss; anything vs unclear is a soft miss.
-function grade(expected: Stance, got: Stance): "match" | "near" | "strict" | "lenient" | "soft" {
-  if (expected === got) return "match";
-  const rank = { allowed: 0, with_disclosure: 1, not_allowed: 2 } as const;
-  if (expected === "unclear" || got === "unclear") return "soft";
-  if (Math.abs(rank[expected] - rank[got]) === 1 && expected !== "not_allowed" && got !== "not_allowed") return "near";
-  return rank[got] > rank[expected] ? "strict" : "lenient";
-}
 
 async function propose() {
   const imported = JSON.parse(readFileSync(IMPORTED, "utf8")) as PolicyCase[];
@@ -110,31 +62,20 @@ async function main() {
   for (let i = 0; i < cases.length; i += 3) {
     const batch = cases.slice(i, i + 3);
     const results = await Promise.all(
-      batch.map(async (p) => {
-        try {
-          const card = await generateRulesCard({ syllabus: p.policy, title: p.assignment.title, instructions: p.assignment.instructions });
-          const got = await stancesFrom("rules card", cardText(card));
-          return { p, card, got };
-        } catch (e) {
-          return { p, error: String(e) };
-        }
-      })
+      batch.map((p) => checkPolicy(p).then((r) => ({ p, r }), (e) => ({ p, error: String(e) })))
     );
-    for (const r of results) {
-      if ("error" in r) {
-        console.log(`ERR  ${r.p.id}  ${r.error}`);
+    for (const x of results) {
+      if ("error" in x) {
+        console.log(`ERR  ${x.p.id}  ${x.error}`);
         continue;
       }
-      const marks: string[] = [];
-      for (const [use, exp] of Object.entries(r.p.expected) as [Use, Stance][]) {
-        const g = grade(exp, r.got[use]);
-        tally[g]++;
-        if (g !== "match") marks.push(`${use}: expected ${exp}, card ${r.got[use]} (${g})`);
-      }
-      const bad = marks.some((m) => m.endsWith("(strict)") || m.endsWith("(lenient)"));
-      console.log(`${bad ? "XX " : marks.length ? "~  " : "ok "} ${r.p.id.padEnd(26)} ${r.p.discipline}`);
+      const { p, r } = x;
+      for (const k of Object.keys(tally) as (keyof typeof tally)[]) tally[k] += r.tally[k];
+      const marks = r.misses.map((m) => `${m.use}: expected ${m.expected}, card ${m.got} (${m.grade})`);
+      const bad = r.misses.some((m) => m.grade === "strict" || m.grade === "lenient");
+      console.log(`${bad ? "XX " : marks.length ? "~  " : "ok "} ${p.id.padEnd(26)} ${p.discipline}`);
       for (const m of marks) console.log(`      ${m}`);
-      rows.push({ id: r.p.id, expected: r.p.expected, got: r.got, card: r.card });
+      rows.push({ id: p.id, expected: p.expected, got: r.got, card: r.card });
     }
   }
 
