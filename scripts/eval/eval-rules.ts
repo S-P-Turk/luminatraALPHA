@@ -4,10 +4,11 @@
 // have a separate, narrowly-prompted Claude call read ONLY the card and say
 // what it permits for six common uses. Compare with the hand labels.
 //
-//   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts            # all labeled
-//   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts real-      # only the real policies
-//   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts pol-cs     # id prefix
-//   ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/eval-rules.ts --propose  # suggest labels for imported policies
+//   Key goes in .env.local (ANTHROPIC_API_KEY=sk-ant-...), not the terminal.
+//   npx tsx scripts/eval/eval-rules.ts            # all labeled
+//   npx tsx scripts/eval/eval-rules.ts real-      # only the real policies
+//   npx tsx scripts/eval/eval-rules.ts pol-cs     # id prefix
+//   npx tsx scripts/eval/eval-rules.ts --propose  # suggest labels for imported policies
 //
 // The two errors that matter most:
 //   strict  - the card forbids something the policy allows (students get
@@ -15,6 +16,7 @@
 //   lenient - the card allows something the policy forbids (the rule the
 //             teacher cares about never reaches the student)
 
+import "./env";
 import { readFileSync, writeFileSync } from "node:fs";
 import type Anthropic from "@anthropic-ai/sdk";
 import { callClaude } from "../../src/lib/ai";
@@ -86,7 +88,7 @@ async function propose() {
 
 async function main() {
   if (!process.env.ANTHROPIC_API_KEY) {
-    console.error("Set ANTHROPIC_API_KEY first.");
+    console.error("No ANTHROPIC_API_KEY. Put it in .env.local in the repo root:  ANTHROPIC_API_KEY=sk-ant-...");
     process.exit(1);
   }
   if (process.argv.includes("--propose")) return propose();

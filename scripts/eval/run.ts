@@ -1,6 +1,7 @@
 // CLI for the evaluation set. Same logic as the admin "Run test set" button.
 // Run:  ANTHROPIC_API_KEY=sk-... npx tsx scripts/eval/run.ts [case-id-prefix]
 
+import "./env";
 import { writeFileSync } from "node:fs";
 import { CASES } from "../../src/lib/eval/cases";
 import { runCase, summarize, type CaseResult } from "../../src/lib/eval/run-case";

@@ -37,9 +37,13 @@ Env vars (values in Vercel, never commit them): `DATABASE_URL`, `ANTHROPIC_API_K
 - Syllabus library: `src/lib/eval/policies-real.ts` (39 real course AI policies, condensed, with source links; internal testing only, don't publish) and `policies.ts` (30 written examples). `scripts/eval/eval-rules.ts` checks rules cards against hand labels; `import-policies.ts` loads a CSV (e.g. the crowdsourced sheet at bit.ly/Syllabi-AI-Policies).
 - Everything shipped on 2026-11-25 was tested only against a mock Claude server (the previous environment had no API key): rules cards, score levers, background analysis, revisions, redaction, rules eval.
 
+## API key (read this before asking about it)
+
+Claude Code itself runs on the founder's claude.ai login and needs no API key. Only the eval scripts call the Anthropic API; they read `ANTHROPIC_API_KEY` from `.env.local` in the repo root (gitignored). Never ask the founder to export the key in the terminal (that makes Claude Code offer to switch to API billing) and never ask him to paste it into chat. If `.env.local` is missing or has no key, say so once, in one line, and continue with work that doesn't need it (steps 3–5 below).
+
 ## Do next (in order)
 
-1. `ANTHROPIC_API_KEY=... npx tsx scripts/eval/eval-rules.ts real-` and fix any "too lenient" errors (card allows what the syllabus forbids).
+1. `npx tsx scripts/eval/eval-rules.ts real-` and fix any "too lenient" errors (card allows what the syllabus forbids).
 2. Run the full 36-case test set against the real model; confirm v3.1 and the new student result view.
 3. One live end-to-end pass on the deployed site: teacher creates assignment → rules card + gaps → student submits → score + levers → revise with added chat → activate quiz → teacher review.
 4. Speed: shorten model output (pointer to matched AI text instead of full excerpts twice) and Haiku for quiz grading / rules cards; rerun the test set before and after.
