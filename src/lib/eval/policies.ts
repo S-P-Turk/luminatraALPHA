@@ -23,6 +23,10 @@ export type PolicyCase = {
   policy: string;
   assignment: { title: string; instructions: string };
   expected: Partial<Record<Use, Stance>>; // uses that don't apply are left out
+  // Other readings that are defensible for a genuinely ambiguous policy, each
+  // with the reason. Clear-cut uses never get one. Scored as "defensible",
+  // reported separately from exact matches.
+  alsoOk?: Partial<Record<Use, { stances: Stance[]; why: string }>>;
   quirk?: string; // what makes this one hard to read
   origin: "synthetic" | "imported";
   source?: string;

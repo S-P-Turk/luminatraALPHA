@@ -57,7 +57,9 @@ async function main() {
   );
   console.log(`Checking rules cards for ${cases.length} labeled policies...\n`);
 
-  const tally = { match: 0, near: 0, soft: 0, strict: 0, lenient: 0 };
+  const tally = { match: 0, defensible: 0, near: 0, soft: 0, strict: 0, lenient: 0 };
+  let fixes = 0;
+  let clean = 0;
   const rows: unknown[] = [];
   for (let i = 0; i < cases.length; i += 3) {
     const batch = cases.slice(i, i + 3);
@@ -71,9 +73,11 @@ async function main() {
       }
       const { p, r } = x;
       for (const k of Object.keys(tally) as (keyof typeof tally)[]) tally[k] += r.tally[k];
+      fixes += r.teacherFixes;
+      if (r.teacherFixes === 0) clean++;
       const marks = r.misses.map((m) => `${m.use}: expected ${m.expected}, card ${m.got} (${m.grade})`);
       const bad = r.misses.some((m) => m.grade === "strict" || m.grade === "lenient");
-      console.log(`${bad ? "XX " : marks.length ? "~  " : "ok "} ${p.id.padEnd(26)} ${p.discipline}`);
+      console.log(`${bad ? "XX " : r.teacherFixes ? "~  " : "ok "} ${p.id.padEnd(26)} ${p.discipline}`);
       for (const m of marks) console.log(`      ${m}`);
       rows.push({ id: p.id, expected: p.expected, got: r.got, card: r.card });
     }
@@ -87,6 +91,9 @@ async function main() {
   const pct = (n: number) => `${Math.round((n / total) * 100)}%`;
   console.log(`\n${total} labeled uses across ${cases.length} policies`);
   console.log(`  exact match      ${tally.match} (${pct(tally.match)})`);
+  console.log(`  + defensible     ${tally.defensible}   -> ${pct(tally.match + tally.defensible)} with defensible readings`);
+  const n = rows.length || 1;
+  console.log(`  teacher fixes    ${(fixes / n).toFixed(1)} rows per syllabus; ${clean}/${rows.length} cards need no change`);
   console.log(`  near miss        ${tally.near} (${pct(tally.near)})   allowed vs with_disclosure`);
   console.log(`  soft miss        ${tally.soft} (${pct(tally.soft)})   one side was "unclear"`);
   console.log(`  too strict       ${tally.strict} (${pct(tally.strict)})   card forbids what the policy allows`);

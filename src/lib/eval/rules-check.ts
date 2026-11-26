@@ -7,9 +7,10 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { callClaude, withAiContext } from "../ai";
 import { generateRulesCard, type RulesCard } from "../rules";
 import { USES, type PolicyCase, type Stance, type Use } from "./policies";
+import { gradeCase, type Grade, type Miss } from "./rules-grade";
+export { grade, type Grade } from "./rules-grade";
 
 export const STANCES: Stance[] = ["allowed", "with_disclosure", "not_allowed", "unclear"];
-export type Grade = "match" | "near" | "soft" | "strict" | "lenient";
 
 const TOOL: Anthropic.Tool = {
   name: "submit_stances",
@@ -47,21 +48,13 @@ export async function stancesFrom(label: string, text: string): Promise<Record<U
 export const cardText = (c: RulesCard) =>
   `ALLOWED:\n${c.allowed.map((x) => `- ${x}`).join("\n") || "(none listed)"}\n\nNOT ALLOWED:\n${c.notAllowed.map((x) => `- ${x}`).join("\n") || "(none listed)"}\n\nDISCLOSURE: ${c.disclose || "(not mentioned)"}\n\nOPEN QUESTIONS THE POLICY DOESN'T ANSWER:\n${c.gaps.map((x) => `- ${x}`).join("\n") || "(none)"}`;
 
-// with_disclosure vs allowed is a near miss; anything vs unclear is a soft miss.
-export function grade(expected: Stance, got: Stance): Grade {
-  if (expected === got) return "match";
-  const rank = { allowed: 0, with_disclosure: 1, not_allowed: 2 } as const;
-  if (expected === "unclear" || got === "unclear") return "soft";
-  if (Math.abs(rank[expected] - rank[got]) === 1 && expected !== "not_allowed" && got !== "not_allowed") return "near";
-  return rank[got] > rank[expected] ? "strict" : "lenient";
-}
-
 export type RulesCheckResult = {
   id: string;
   card: RulesCard;
   got: Record<Use, Stance>;
-  misses: { use: Use; expected: Stance; got: Stance; grade: Grade }[];
+  misses: Miss[];
   tally: Record<Grade, number>;
+  teacherFixes: number;
 };
 
 export async function checkPolicy(p: PolicyCase): Promise<RulesCheckResult> {
@@ -75,13 +68,7 @@ export async function checkPolicy(p: PolicyCase): Promise<RulesCheckResult> {
           Object.entries(card.uses!).map(([k, v]) => [k, v === "n/a" ? "unclear" : v])
         ) as Record<Use, Stance>)
       : await stancesFrom("rules card", cardText(card));
-    const tally: Record<Grade, number> = { match: 0, near: 0, soft: 0, strict: 0, lenient: 0 };
-    const misses: RulesCheckResult["misses"] = [];
-    for (const [use, exp] of Object.entries(p.expected) as [Use, Stance][]) {
-      const g = grade(exp, got[use]);
-      tally[g]++;
-      if (g !== "match") misses.push({ use, expected: exp, got: got[use], grade: g });
-    }
-    return { id: p.id, card, got, misses, tally };
+    const { tally, misses, teacherFixes } = gradeCase(p, got);
+    return { id: p.id, card, got, misses, tally, teacherFixes };
   });
 }

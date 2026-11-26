@@ -4,7 +4,8 @@ import { Fragment, useEffect, useState } from "react";
 import { K, Cell, Btn, th, td, tdMono } from "../ui";
 import { toast } from "@/src/components/Toaster";
 import { REAL_POLICY_CASES } from "@/src/lib/eval/policies-real";
-import type { RulesCheckResult, Grade } from "@/src/lib/eval/rules-check";
+import type { RulesCheckResult } from "@/src/lib/eval/rules-check";
+import { gradeCase, GRADES, type Grade, type Miss } from "@/src/lib/eval/rules-grade";
 
 // Runs the rules-card check on the 39 real course policies, on the live
 // site's API key, from the browser. Same logic as scripts/eval/eval-rules.ts.
@@ -14,6 +15,7 @@ type Row = { id: string; state: "idle" | "running" | "done" | "error"; result?: 
 const CONCURRENCY = 4;
 const GRADE_LABEL: Record<Grade, string> = {
   match: "match",
+  defensible: "defensible reading",
   near: "near miss",
   soft: "soft miss",
   strict: "too strict",
@@ -78,27 +80,40 @@ export function RulesCheck() {
 
   const done = rows.filter((r) => r.state === "done");
   const errored = rows.filter((r) => r.state === "error");
-  const tally: Record<Grade, number> = { match: 0, near: 0, soft: 0, strict: 0, lenient: 0 };
-  for (const r of done) for (const g of Object.keys(tally) as Grade[]) tally[g] += r.result!.tally[g];
+  // Re-score from the card's answers with the current labels, so label
+  // changes show up without rerunning the model.
+  const graded = new Map<string, { tally: Record<Grade, number>; misses: Miss[]; teacherFixes: number }>();
+  for (const r of done) {
+    const p = REAL_POLICY_CASES.find((x) => x.id === r.id);
+    if (p && r.result?.got) graded.set(r.id, gradeCase(p, r.result.got));
+  }
+  const tally = Object.fromEntries(GRADES.map((g) => [g, 0])) as Record<Grade, number>;
+  for (const g of graded.values()) for (const k of GRADES) tally[k] += g.tally[k];
   const total = Object.values(tally).reduce((a, b) => a + b, 0);
   const pctOf = (n: number) => (total ? `${Math.round((n / total) * 100)}%` : "—");
+  const fixes = [...graded.values()].reduce((n, g) => n + g.teacherFixes, 0);
+  const perSyllabus = graded.size ? (fixes / graded.size).toFixed(1) : "—";
+  const cleanCards = [...graded.values()].filter((g) => g.teacherFixes === 0).length;
 
   // Worst first: lenient, then strict, then other misses, then clean.
+  const g = (id: string) => graded.get(id);
   const rank = (r: Row) =>
-    r.state === "error" ? 0 : !r.result ? 5 : r.result.tally.lenient ? 1 : r.result.tally.strict ? 2 : r.result.misses.length ? 3 : 4;
+    r.state === "error" ? 0 : !g(r.id) ? 5 : g(r.id)!.tally.lenient ? 1 : g(r.id)!.tally.strict ? 2 : g(r.id)!.teacherFixes ? 3 : 4;
   const sorted = [...rows].sort((a, b) => rank(a) - rank(b));
 
   function copyResults() {
     const lines = [
       `Rules-card check: ${done.length}/${rows.length} policies, ${total} labeled uses`,
-      `match ${tally.match} (${pctOf(tally.match)}) · near ${tally.near} · soft ${tally.soft} · too strict ${tally.strict} · too lenient ${tally.lenient}`,
+      `strict exact ${tally.match} (${pctOf(tally.match)}) · with defensible readings ${tally.match + tally.defensible} (${pctOf(tally.match + tally.defensible)})`,
+      `teacher fixes: ${perSyllabus} rows per syllabus · ${cleanCards}/${graded.size} cards need no change`,
+      `near ${tally.near} · soft ${tally.soft} · too strict ${tally.strict} · too lenient ${tally.lenient}`,
       "",
       ...sorted
-        .filter((r) => r.state === "error" || (r.result && r.result.misses.length))
+        .filter((r) => r.state === "error" || (g(r.id) && g(r.id)!.misses.length))
         .map((r) =>
           r.state === "error"
             ? `ERR ${r.id}: ${r.error}`
-            : `${r.id}: ${r.result!.misses.map((m) => `${m.use} expected ${m.expected}, card ${m.got} (${GRADE_LABEL[m.grade]})`).join("; ")}`
+            : `${r.id}: ${g(r.id)!.misses.map((m) => `${m.use} expected ${m.expected}, card ${m.got} (${GRADE_LABEL[m.grade]})`).join("; ")}`
         ),
     ];
     navigator.clipboard.writeText(lines.join("\n")).then(
@@ -126,7 +141,9 @@ export function RulesCheck() {
       {total > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 18px", fontFamily: K.mono, fontSize: 12, marginBottom: 10 }}>
           <span>{done.length}/{rows.length} policies · {total} labeled uses</span>
-          <span style={{ color: K.sage }}>match {tally.match} ({pctOf(tally.match)})</span>
+          <span style={{ color: K.sage }}>strict exact {tally.match} ({pctOf(tally.match)})</span>
+          <span style={{ color: K.sage }}>with defensible readings {pctOf(tally.match + tally.defensible)}</span>
+          <span style={{ color: K.fg }}>teacher fixes {perSyllabus}/syllabus · {cleanCards}/{graded.size} cards need none</span>
           <span style={{ color: K.mute }}>near miss {tally.near}</span>
           <span style={{ color: K.mute }}>soft miss {tally.soft}</span>
           <span style={{ color: tally.strict ? K.sig : K.mute }}>too strict {tally.strict}</span>
@@ -148,8 +165,9 @@ export function RulesCheck() {
             {sorted.map((r) => {
               const p = REAL_POLICY_CASES.find((x) => x.id === r.id)!;
               const res = r.result;
+              const gr = g(r.id);
               const status =
-                r.state === "running" ? "running…" : r.state === "error" ? "error" : !res ? "—" : res.tally.lenient ? "too lenient" : res.tally.strict ? "too strict" : res.misses.length ? "minor misses" : "ok";
+                r.state === "running" ? "running…" : r.state === "error" ? "error" : !gr ? "—" : gr.tally.lenient ? "too lenient" : gr.tally.strict ? "too strict" : gr.teacherFixes ? `${gr.teacherFixes} fix${gr.teacherFixes > 1 ? "es" : ""}` : "ok";
               const color = status === "too lenient" || status === "error" ? K.clay : status === "too strict" ? K.sig : status === "ok" ? K.sage : K.mute;
               return (
                 <Fragment key={r.id}>
@@ -160,7 +178,7 @@ export function RulesCheck() {
                     <td style={{ ...td, color: K.mute }}>
                       {r.state === "error"
                         ? r.error
-                        : res?.misses.map((m) => `${m.use}: ${m.expected} → ${m.got}`).join(" · ")}
+                        : gr?.misses.map((m) => `${m.use}: ${m.expected} → ${m.got}${m.grade === "defensible" ? " (defensible)" : ""}`).join(" · ")}
                     </td>
                   </tr>
                   {open === r.id && res && (
@@ -176,6 +194,9 @@ export function RulesCheck() {
                         <div><strong>Not allowed:</strong> {res.card.notAllowed.join("; ") || "none listed"}</div>
                         <div><strong>Disclosure:</strong> {res.card.disclose || "not mentioned"}</div>
                         <div><strong>Gaps:</strong> {res.card.gaps.join("; ") || "none"}</div>
+                        {gr?.misses.filter((m) => m.why).map((m) => (
+                          <div key={m.use} style={{ color: K.mute }}>Defensible {m.use}: {m.why}</div>
+                        ))}
                         {p.quirk && <div style={{ color: K.mute, marginTop: 4 }}>Why it&apos;s hard: {p.quirk}</div>}
                         {p.source && (
                           <a href={p.source} target="_blank" rel="noreferrer" style={{ color: K.sig, fontFamily: K.mono }}>
