@@ -140,6 +140,12 @@ export function RulesCheck() {
                   {open === r.id && res && (
                     <tr>
                       <td colSpan={4} style={{ ...td, fontSize: 12, lineHeight: 1.5 }}>
+                        {res.card.uses && (
+                          <div style={{ fontFamily: K.mono }}>
+                            <strong>Per use:</strong>{" "}
+                            {Object.entries(res.card.uses).map(([u, v]) => `${u} ${v}`).join(" · ")}
+                          </div>
+                        )}
                         <div><strong>Allowed:</strong> {res.card.allowed.join("; ") || "none listed"}</div>
                         <div><strong>Not allowed:</strong> {res.card.notAllowed.join("; ") || "none listed"}</div>
                         <div><strong>Disclosure:</strong> {res.card.disclose || "not mentioned"}</div>

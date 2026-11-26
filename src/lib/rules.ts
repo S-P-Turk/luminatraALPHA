@@ -6,7 +6,12 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { callClaude } from "./ai";
 
+import { CARD_USES, type CardUse, type UseStance } from "./rules-shared";
+export { CARD_USES, type CardUse, type UseStance };
+
 export type RulesCard = {
+  // An explicit answer for each common use. Older cards may not have it.
+  uses?: Partial<Record<CardUse, UseStance>>;
   allowed: string[]; // short lines, e.g. "Brainstorming topics with AI"
   notAllowed: string[];
   disclose: string; // how to disclose AI use; "" if the syllabus says nothing
@@ -17,6 +22,16 @@ export type RulesCard = {
 const SYSTEM_PROMPT = `You turn a course's AI-use policy into a short rules card a student can read in 20 seconds before starting one assignment.
 
 Use only what the syllabus and assignment instructions actually say. Never invent a rule. If the policy is silent on something, do not guess; list it under gaps instead.
+
+- uses: give an explicit answer for EACH of these six uses on this assignment:
+  brainstorm (ideas, topics, outlines, counterarguments), grammar (an AI tool fixing grammar or spelling in the student's own text), paraphrase (AI rewording or polishing sentences the student wrote), draft (submitting sentences or paragraphs an AI wrote), research (AI explaining concepts, looking up facts, finding sources), code (AI writing or fixing code).
+  Answer allowed, with_disclosure, not_allowed, unclear, or n/a (only for code when the assignment involves no code).
+  How to read policies:
+  * A blanket ban ("no AI in this course", "any use of AI is prohibited", "AI may not be used on any assignment") covers EVERY use, including grammar help and research. Answer not_allowed for all six unless the policy carves out an exception. A default ban that applies when the assignment doesn't grant permission also means not_allowed.
+  * Basic spell-check or grammar features of a word processor are not AI. If the policy allows those but forbids AI or generative tools (or names Grammarly's AI features as AI), grammar is not_allowed.
+  * "Don't present AI work as your own", "the work must mainly be yours", or "purely AI work won't meet the standard" are NOT bans when the policy also lets students use AI text with credit or citation. Then draft is with_disclosure (or allowed if no disclosure is required).
+  * A general disclosure rule ("cite any AI use", "acknowledge all AI use") turns every permitted use into with_disclosure.
+  * Use unclear only when the policy genuinely doesn't settle the use, and then also list it under gaps.
 
 - allowed: what students may use AI for on this assignment. Each line under 10 words, starting with a verb-ing or noun (e.g. "Brainstorming topics", "Checking grammar and spelling"). Max 5.
 - notAllowed: what they may not use AI for. Same style. Max 5.
@@ -31,12 +46,22 @@ const TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
+      uses: {
+        type: "object",
+        properties: Object.fromEntries(
+          ["brainstorm", "grammar", "paraphrase", "draft", "research", "code"].map((u) => [
+            u,
+            { type: "string", enum: ["allowed", "with_disclosure", "not_allowed", "unclear", "n/a"] },
+          ])
+        ),
+        required: ["brainstorm", "grammar", "paraphrase", "draft", "research", "code"],
+      },
       allowed: { type: "array", items: { type: "string" } },
       notAllowed: { type: "array", items: { type: "string" } },
       disclose: { type: "string" },
       gaps: { type: "array", items: { type: "string" } },
     },
-    required: ["allowed", "notAllowed", "disclose", "gaps"],
+    required: ["uses", "allowed", "notAllowed", "disclose", "gaps"],
   },
 };
 
@@ -51,7 +76,7 @@ export async function generateRulesCard(input: {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("Server is missing ANTHROPIC_API_KEY.");
   const message = await callClaude("rules", {
     model: "claude-sonnet-5",
-    max_tokens: 800,
+    max_tokens: 1000,
     system: SYSTEM_PROMPT,
     tools: [TOOL],
     tool_choice: { type: "tool", name: "submit_rules" },
@@ -65,7 +90,15 @@ export async function generateRulesCard(input: {
   const block = message.content.find((b) => b.type === "tool_use" && b.name === "submit_rules");
   if (!block || block.type !== "tool_use") throw new Error("Couldn't write the rules card. Try again.");
   const r = block.input as Record<string, unknown>;
+  const STANCES = ["allowed", "with_disclosure", "not_allowed", "unclear", "n/a"];
+  const rawUses = (r.uses ?? {}) as Record<string, unknown>;
+  const uses: Partial<Record<CardUse, UseStance>> = {};
+  for (const { key } of CARD_USES) {
+    const v = rawUses[key];
+    if (typeof v === "string" && STANCES.includes(v)) uses[key] = v as UseStance;
+  }
   return {
+    uses,
     allowed: strs(r.allowed, 5),
     notAllowed: strs(r.notAllowed, 5),
     disclose: typeof r.disclose === "string" ? r.disclose.trim() : "",
@@ -77,7 +110,7 @@ export async function generateRulesCard(input: {
 /** The card students see: everything except the teacher-only gaps. */
 export function rulesForStudent(card: RulesCard | null) {
   if (!card) return null;
-  return { allowed: card.allowed, notAllowed: card.notAllowed, disclose: card.disclose };
+  return { uses: card.uses, allowed: card.allowed, notAllowed: card.notAllowed, disclose: card.disclose };
 }
 
 /**
@@ -92,7 +125,9 @@ export async function ensureRulesCard(assignment: {
   instructions: string;
   rulesCard?: unknown;
 }): Promise<RulesCard | null> {
-  if (assignment.rulesCard) return assignment.rulesCard as RulesCard;
+  const existing = assignment.rulesCard as RulesCard | null | undefined;
+  // Cards written before the per-use grid existed are rewritten once.
+  if (existing && existing.uses && Object.keys(existing.uses).length > 0) return existing;
   const { db } = await import("@/src/prisma/db");
   const { withAiContext } = await import("./ai");
   const cls = await db.orm.public.Class.where({ id: assignment.classId }).select("syllabusText").first();
@@ -104,6 +139,6 @@ export async function ensureRulesCard(assignment: {
     await db.orm.public.Assignment.where({ id: assignment.id }).update({ rulesCard: card });
     return card;
   } catch {
-    return null;
+    return existing ?? null;
   }
 }

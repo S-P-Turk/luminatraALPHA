@@ -1,5 +1,7 @@
 "use client";
 
+import { UsesGrid } from "@/src/components/UsesGrid";
+import type { CardUse, UseStance } from "@/src/lib/rules-shared";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -14,7 +16,7 @@ type Assignment = {
   open: boolean;
   quizOpen: boolean;
   createdAt: string;
-  rulesCard?: { allowed: string[]; notAllowed: string[]; disclose: string; gaps: string[] } | null;
+  rulesCard?: { uses?: Partial<Record<CardUse, UseStance>>; allowed: string[]; notAllowed: string[]; disclose: string; gaps: string[] } | null;
 };
 
 type Suggestion = { title: string; instructions: string };
@@ -464,6 +466,7 @@ export default function AssignmentsClient() {
                   <details style={{ fontSize: 13, marginTop: 6 }}>
                     <summary style={{ cursor: "pointer", color: colors.muted }}>Rules students see before they start</summary>
                     <div style={{ marginTop: 4 }}>
+                      <UsesGrid uses={a.rulesCard.uses} fontSize={13} />
                       <div><strong>Allowed:</strong> {a.rulesCard.allowed.join("; ") || "nothing listed"}</div>
                       <div><strong>Not allowed:</strong> {a.rulesCard.notAllowed.join("; ") || "nothing listed"}</div>
                       {a.rulesCard.disclose && <div><strong>Disclosure:</strong> {a.rulesCard.disclose}</div>}

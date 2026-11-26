@@ -67,7 +67,14 @@ export type RulesCheckResult = {
 export async function checkPolicy(p: PolicyCase): Promise<RulesCheckResult> {
   return withAiContext({ step: "eval" }, async () => {
     const card = await generateRulesCard({ syllabus: p.policy, title: p.assignment.title, instructions: p.assignment.instructions });
-    const got = await stancesFrom("rules card", cardText(card));
+    // Cards now state each use explicitly; read those directly. Fall back to
+    // a classifier reading the card text for older-style cards.
+    const structured = card.uses && Object.keys(card.uses).length >= 5;
+    const got = structured
+      ? (Object.fromEntries(
+          Object.entries(card.uses!).map(([k, v]) => [k, v === "n/a" ? "unclear" : v])
+        ) as Record<Use, Stance>)
+      : await stancesFrom("rules card", cardText(card));
     const tally: Record<Grade, number> = { match: 0, near: 0, soft: 0, strict: 0, lenient: 0 };
     const misses: RulesCheckResult["misses"] = [];
     for (const [use, exp] of Object.entries(p.expected) as [Use, Stance][]) {

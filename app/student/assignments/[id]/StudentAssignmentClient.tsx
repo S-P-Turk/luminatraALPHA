@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Spinner, WorkingNote } from "@/src/components/Spinner";
 import { toast } from "@/src/components/Toaster";
+import { UsesGrid } from "@/src/components/UsesGrid";
+import type { CardUse, UseStance } from "@/src/lib/rules-shared";
 
 type QuizQuestion = {
   question: string;
@@ -28,7 +30,7 @@ type Result = {
   scoreIfAllFixed: number;
 };
 
-type Rules = { allowed: string[]; notAllowed: string[]; disclose: string };
+type Rules = { uses?: Partial<Record<CardUse, UseStance>>; allowed: string[]; notAllowed: string[]; disclose: string };
 
 const SIGNAL_NAME = { comprehension: "Comprehension quiz", reliance: "AI reliance", policy: "Course AI rules" } as const;
 const LEVEL_NAME: Record<string, string> = {
@@ -593,6 +595,7 @@ function RulesCard({ rules }: { rules: Rules }) {
   return (
     <section aria-label="AI rules for this assignment" style={box}>
       <h2 style={{ ...smallHead, color: colors.accent }}>AI rules for this assignment</h2>
+      <UsesGrid uses={rules.uses} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: colors.green, marginBottom: 4 }}>You can use AI for</div>
