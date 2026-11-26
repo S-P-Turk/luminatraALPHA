@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { K, Cell, Btn, th, td, tdMono } from "../ui";
 import { toast } from "@/src/components/Toaster";
 import { REAL_POLICY_CASES } from "@/src/lib/eval/policies-real";
@@ -24,12 +24,28 @@ export function RulesCheck() {
   const [rows, setRows] = useState<Row[]>(REAL_POLICY_CASES.map((p) => ({ id: p.id, state: "idle" })));
   const [running, setRunning] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  // Show the last saved check so results survive a reload or leaving the page.
+  useEffect(() => {
+    fetch("/api/admin/eval/rules")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const results = (d?.saved?.results ?? []) as RulesCheckResult[];
+        if (!results.length) return;
+        const byId = new Map(results.map((r) => [r.id, r]));
+        setRows((prev) => prev.map((r) => (byId.has(r.id) ? { id: r.id, state: "done", result: byId.get(r.id) } : r)));
+        setSavedAt(new Date(d.saved.at).toLocaleString());
+      })
+      .catch(() => {});
+  }, []);
 
   async function run(ids?: string[]) {
     setRunning(true);
     const targets = ids ?? REAL_POLICY_CASES.map((p) => p.id);
     setRows((prev) => prev.map((r) => (targets.includes(r.id) ? { id: r.id, state: "idle" } : r)));
     const queue = [...targets];
+    const collected = new Map<string, RulesCheckResult>();
     async function worker() {
       while (queue.length) {
         const id = queue.shift()!;
@@ -40,6 +56,7 @@ export function RulesCheck() {
           res = await fetch(`/api/admin/eval/rules/${id}`, { method: "POST" }).catch(() => null);
         }
         const d = res ? await res.json().catch(() => ({})) : {};
+        if (res?.ok && d.result) collected.set(id, d.result);
         setRows((prev) =>
           prev.map((r) =>
             r.id !== id ? r : res?.ok ? { id, state: "done", result: d.result } : { id, state: "error", error: d.error ?? "request failed" }
@@ -49,6 +66,14 @@ export function RulesCheck() {
     }
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
     setRunning(false);
+    if (!ids && collected.size) {
+      const ok = await fetch("/api/admin/eval/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ results: [...collected.values()] }),
+      }).then((r) => r.ok, () => false);
+      if (ok) setSavedAt(new Date().toLocaleString());
+    }
   }
 
   const done = rows.filter((r) => r.state === "done");
@@ -92,6 +117,7 @@ export function RulesCheck() {
           <Btn onClick={() => void run(errored.map((r) => r.id))}>retry {errored.length} errored</Btn>
         )}
         {done.length > 0 && <Btn onClick={copyResults}>copy results</Btn>}
+        {savedAt && <span style={{ fontFamily: K.mono, fontSize: 12, color: K.sage }}>showing run from {savedAt}</span>}
         <span style={{ fontFamily: K.mono, fontSize: 12, color: K.mute }}>
           writes each rules card, then checks it against hand labels for six uses. ~80 calls, about $1.
         </span>

@@ -19,7 +19,19 @@ export async function POST(request: Request) {
     borderline: n("borderline"),
     errors: n("errors"),
     costUsd: n("costUsd"),
-    detail: Array.isArray(b?.misses) ? { misses: b.misses.slice(0, 100) } : null,
+    detail: {
+      misses: Array.isArray(b?.misses) ? b.misses.slice(0, 100) : [],
+      // Per-case results so the test lab can show the last run after a reload.
+      results: Array.isArray(b?.results) ? b.results.slice(0, 200) : [],
+    },
   });
   return NextResponse.json({ run }, { status: 201 });
+}
+
+// The most recent saved run, with per-case results, for the test lab.
+export async function GET() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const run = await db.orm.public.EvalRun.orderBy((r) => r.createdAt.desc()).first();
+  return NextResponse.json({ run: run ?? null });
 }

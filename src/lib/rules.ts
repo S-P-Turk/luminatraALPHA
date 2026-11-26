@@ -28,7 +28,8 @@ Use only what the syllabus and assignment instructions actually say. Never inven
   Answer allowed, with_disclosure, not_allowed, unclear, or n/a (only for code when the assignment involves no code).
   How to read policies:
   * A blanket ban ("no AI in this course", "any use of AI is prohibited", "AI may not be used on any assignment") covers EVERY use, including grammar help and research. Answer not_allowed for all six unless the policy carves out an exception. A default ban that applies when the assignment doesn't grant permission also means not_allowed.
-  * Basic spell-check or grammar features of a word processor are not AI. If the policy allows those but forbids AI or generative tools (or names Grammarly's AI features as AI), grammar is not_allowed.
+  * "grammar" means grammar help from an AI tool (a chatbot, or AI features like GrammarlyGO). Basic spell-check and grammar checkers (Word, Google Docs, PaperRater, SpellCheckPlus) are NOT AI. If a policy allows those basic tools but restricts generative AI, answer grammar not_allowed and put the basic tools in the allowed list instead.
+  * A rule against one kind of AI use does not ban uses it doesn't mention. "Don't use AI to complete assignments / write your answers / generate code or proofs" bans draft (and code), but says nothing about brainstorming, research, or rewording: those are unclear and go in gaps. Only a ban on AI as a whole covers every use.
   * "Don't present AI work as your own", "the work must mainly be yours", or "purely AI work won't meet the standard" are NOT bans when the policy also lets students use AI text with credit or citation. Then draft is with_disclosure (or allowed if no disclosure is required).
   * A general disclosure rule ("cite any AI use", "acknowledge all AI use") turns every permitted use into with_disclosure.
   * Use unclear only when the policy genuinely doesn't settle the use, and then also list it under gaps.

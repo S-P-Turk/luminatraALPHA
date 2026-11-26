@@ -87,7 +87,17 @@ export default function LabClient() {
     const res = await fetch("/api/admin/eval?full=1");
     if (!res.ok) return;
     const d = await res.json();
-    setRows((d.cases as CaseInfo[]).map((info) => ({ info, state: "idle" })));
+    // Show the last saved run so results survive a reload or leaving the page.
+    const last = await fetch("/api/admin/eval/runs").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const saved = new Map<string, CaseResult>(
+      ((last?.run?.detail?.results ?? []) as CaseResult[]).filter((r) => r && r.id).map((r) => [r.id, r])
+    );
+    setRows(
+      (d.cases as CaseInfo[]).map((info) =>
+        saved.has(info.id) ? { info, state: "done", result: saved.get(info.id) } : { info, state: "idle" }
+      )
+    );
+    if (saved.size && last?.run?.createdAt) setSavedRunAt(new Date(last.run.createdAt).toLocaleString());
   }, []);
 
   useEffect(() => {
@@ -254,6 +264,7 @@ export default function LabClient() {
         errors: all.filter((r) => r.state === "error").length,
         costUsd: done.reduce((s, r) => s + (r.result!.costUsd ?? 0), 0),
         misses: done.filter((r) => r.result!.correct === false || r.result!.relianceCorrect === false).map((r) => r.info.id),
+        results: done.map((r) => r.result),
       };
       const saved = await fetch("/api/admin/eval/runs", {
         method: "POST",

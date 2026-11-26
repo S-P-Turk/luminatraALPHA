@@ -45,9 +45,16 @@ export const DEFAULT_SETTINGS: BudgetSettings = { monthlyBudget: 50, alertAt: 0.
 
 export async function getSettings(): Promise<BudgetSettings> {
   const db = await getDb();
+  // Only the budget keys: other settings rows (e.g. saved check results) can be large.
   let rows: { key: string; value: string }[] = [];
   try {
-    rows = db ? await db.orm.public.AdminSetting.all() : [];
+    rows = db
+      ? (
+          await Promise.all(
+            ["monthlyBudget", "alertAt", "hardStop"].map((key) => db.orm.public.AdminSetting.where({ key }).first())
+          )
+        ).filter((r): r is { id: number; key: string; value: string } => !!r)
+      : [];
   } catch {
     rows = [];
   }
