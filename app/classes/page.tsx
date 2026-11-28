@@ -33,6 +33,10 @@ export default function ClassesPage() {
   const [codeError, setCodeError] = useState<string | null>(null);
   const [savingCode, setSavingCode] = useState(false);
   const [needsReview, setNeedsReview] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -57,6 +61,24 @@ export default function ClassesPage() {
       setNeedsReview(
         (reviewData.submissions as { status: string }[]).filter((s) => s.status === "flagged").length
       );
+    }
+  }
+
+  async function deleteClass(cls: ClassRow) {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/classes/${cls.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Couldn't delete this class.");
+        return;
+      }
+      setClasses((prev) => (prev ? prev.filter((c) => c.id !== cls.id) : prev));
+      setDeletingId(null);
+      setDeleteText("");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -316,7 +338,91 @@ export default function ClassesPage() {
                 >
                   Review submissions
                 </Link>
+                {deletingId !== cls.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeletingId(cls.id);
+                      setDeleteText("");
+                      setDeleteError(null);
+                    }}
+                    style={{
+                      background: "#fff",
+                      color: "#A0442C",
+                      border: "1px solid #E5C4B8",
+                      borderRadius: 8,
+                      padding: "7px 14px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Delete class
+                  </button>
+                )}
               </div>
+              {deletingId === cls.id && (
+                <div
+                  role="alertdialog"
+                  aria-label={`Delete ${cls.name}`}
+                  style={{
+                    flexBasis: "100%",
+                    background: "#FBEFEA",
+                    border: "1px solid #E5C4B8",
+                    borderRadius: 8,
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    fontSize: 13,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: "#A0442C" }}>
+                    Delete {cls.name} permanently?
+                  </div>
+                  <div style={{ color: colors.ink }}>
+                    This removes every assignment, every student submission and quiz answer, and the class roster.
+                    Students lose access right away. It can&apos;t be undone.
+                  </div>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    Type the class name to confirm:
+                    <input
+                      value={deleteText}
+                      onChange={(e) => setDeleteText(e.target.value)}
+                      placeholder={cls.name}
+                      autoFocus
+                      style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: 6, padding: "7px 10px", fontSize: 13, fontFamily: "inherit" }}
+                    />
+                  </label>
+                  {deleteError && <div style={{ color: "#A0442C" }}>{deleteError}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      disabled={deleteText.trim() !== cls.name.trim() || deleteBusy}
+                      onClick={() => void deleteClass(cls)}
+                      style={{
+                        background: deleteText.trim() === cls.name.trim() ? "#A0442C" : "#D9B3A6",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "7px 14px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: deleteText.trim() === cls.name.trim() ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      {deleteBusy ? "Deleting…" : "Delete class"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeletingId(null)}
+                      style={{ background: "#fff", color: colors.ink, border: `1px solid ${colors.cardBorder}`, borderRadius: 6, padding: "7px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

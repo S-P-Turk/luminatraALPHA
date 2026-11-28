@@ -51,6 +51,19 @@ export default function StudentHomePage() {
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<number | null>(null);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+
+  async function leaveClass(id: number) {
+    setLeaveBusy(true);
+    try {
+      const res = await fetch(`/api/student/classes/${id}`, { method: "DELETE" });
+      if (res.ok) setClasses((prev) => (prev ? prev.filter((c) => c.id !== id) : prev));
+      setLeavingId(null);
+    } finally {
+      setLeaveBusy(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -198,38 +211,69 @@ export default function StudentHomePage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {classes?.map((cls) => {
             const label = statusLabel(cls);
+            const small: React.CSSProperties = { borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
             return (
-              <Link
+              <div
                 key={cls.id}
-                href={`/student/classes/${cls.id}`}
-                style={{
-                  background: "#fff",
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 10,
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 16,
-                  textDecoration: "none",
-                  color: colors.ink,
-                }}
+                style={{ background: "#fff", border: `1px solid ${colors.border}`, borderRadius: 10, overflow: "hidden" }}
               >
-                <div style={{ fontSize: 16, fontWeight: 600 }}>{cls.name}</div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    background: label.bg,
-                    color: label.fg,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {label.text}
-                </span>
-              </Link>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px" }}>
+                  <Link
+                    href={`/student/classes/${cls.id}`}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, textDecoration: "none", color: colors.ink }}
+                  >
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>{cls.name}</div>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: label.bg,
+                        color: label.fg,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {label.text}
+                    </span>
+                  </Link>
+                  {leavingId !== cls.id && (
+                    <button
+                      type="button"
+                      onClick={() => setLeavingId(cls.id)}
+                      style={{ ...small, background: "#fff", color: colors.muted, border: `1px solid ${colors.border}` }}
+                    >
+                      Leave class
+                    </button>
+                  )}
+                </div>
+                {leavingId === cls.id && (
+                  <div
+                    role="alertdialog"
+                    aria-label={`Leave ${cls.name}`}
+                    style={{ borderTop: `1px solid ${colors.border}`, background: "#FBF7EE", padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13 }}
+                  >
+                    <span style={{ flex: 1, minWidth: 220 }}>
+                      Leave {cls.name}? You can rejoin with the class code. Anything you already submitted stays with your teacher.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={leaveBusy}
+                      onClick={() => void leaveClass(cls.id)}
+                      style={{ ...small, background: colors.ink, color: "#fff", border: "none" }}
+                    >
+                      {leaveBusy ? "Leaving…" : "Leave"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLeavingId(null)}
+                      style={{ ...small, background: "#fff", color: colors.ink, border: `1px solid ${colors.border}` }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

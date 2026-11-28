@@ -57,3 +57,17 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/cla
 
   return NextResponse.json({ class: cls, assignments: result });
 }
+
+// Leaves a class. Only the enrollment goes: submissions stay with the teacher
+// as the course record, and reappear if the student rejoins with the code.
+export async function DELETE(_request: Request, ctx: RouteContext<"/api/student/classes/[id]">) {
+  const session = await getCurrentStudentSession();
+  if (!session) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+
+  const classId = Number((await ctx.params).id);
+  if (!Number.isInteger(classId)) return NextResponse.json({ error: "Invalid class id." }, { status: 400 });
+
+  const removed = await db.orm.public.Enrollment.where({ classId, studentEmail: session.email }).deleteAndCount();
+  if (!removed) return NextResponse.json({ error: "You're not in this class." }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}

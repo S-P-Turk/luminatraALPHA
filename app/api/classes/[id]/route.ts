@@ -70,3 +70,24 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/classes/[i
 
   return NextResponse.json({ class: updated });
 }
+
+// Deletes a class and everything in it: assignments, enrollments and student
+// submissions. Spending records (ApiCall) stay for cost history. Order
+// matters: children first, so a failure part-way never leaves rows pointing
+// at a class that's gone; the teacher can simply delete again.
+export async function DELETE(_request: Request, ctx: RouteContext<"/api/classes/[id]">) {
+  const teacher = await getCurrentTeacher();
+  if (!teacher) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+
+  const id = Number((await ctx.params).id);
+  if (!Number.isInteger(id)) return NextResponse.json({ error: "Invalid class id." }, { status: 400 });
+
+  const existing = await db.orm.public.Class.where({ id, teacherId: teacher.id }).select("id").first();
+  if (!existing) return NextResponse.json({ error: "Class not found." }, { status: 404 });
+
+  await db.orm.public.Submission.where({ classId: id }).deleteAndCount();
+  await db.orm.public.Enrollment.where({ classId: id }).deleteAndCount();
+  await db.orm.public.Assignment.where({ classId: id }).deleteAndCount();
+  await db.orm.public.Class.where({ id }).delete();
+  return NextResponse.json({ ok: true });
+}
