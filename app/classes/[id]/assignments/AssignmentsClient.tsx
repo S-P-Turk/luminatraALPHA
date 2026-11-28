@@ -1,7 +1,8 @@
 "use client";
 
+import { RulesEditor } from "./RulesEditor";
 import { UsesGrid } from "@/src/components/UsesGrid";
-import type { CardUse, UseStance } from "@/src/lib/rules-shared";
+import { RULES_MODE_LABEL, type CardUse, type UseStance, type RulesMode } from "@/src/lib/rules-shared";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -16,7 +17,7 @@ type Assignment = {
   open: boolean;
   quizOpen: boolean;
   createdAt: string;
-  rulesCard?: { uses?: Partial<Record<CardUse, UseStance>>; allowed: string[]; notAllowed: string[]; disclose: string; gaps: string[] } | null;
+  rulesCard?: { uses?: Partial<Record<CardUse, UseStance>>; allowed: string[]; notAllowed: string[]; disclose: string; gaps: string[]; confirmedByTeacher?: boolean; mode?: RulesMode } | null;
 };
 
 type Suggestion = { title: string; instructions: string };
@@ -42,6 +43,8 @@ export default function AssignmentsClient() {
   const [instructions, setInstructions] = useState("");
   const [creating, setCreating] = useState(false);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [editingRulesId, setEditingRulesId] = useState<number | null>(null);
+  const [modeSavingId, setModeSavingId] = useState<number | null>(null);
 
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
   const [suggesting, setSuggesting] = useState(false);
@@ -164,6 +167,21 @@ export default function AssignmentsClient() {
     } finally {
       setTogglingId(null);
     }
+  }
+
+  async function setRulesMode(a: Assignment, mode: "syllabus" | "no_ai") {
+    setEditingRulesId(null);
+    setModeSavingId(a.id);
+    const res = await fetch(`/api/classes/${params.id}/assignments/${a.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rulesMode: mode }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setModeSavingId(null);
+    if (!res.ok) return toast(data.error ?? "Couldn't change the AI rules.", "error");
+    setAssignments((prev) => (prev ? prev.map((x) => (x.id === a.id ? { ...x, rulesCard: data.assignment.rulesCard } : x)) : prev));
+    toast(mode === "no_ai" ? "No AI use allowed on this assignment." : "Using the rules from your syllabus.");
   }
 
   async function toggleOpen(a: Assignment) {
@@ -456,7 +474,7 @@ export default function AssignmentsClient() {
                 </div>
                 {a.rulesCard && a.rulesCard.gaps.length > 0 && (
                   <div style={{ fontSize: 13, color: "#B8822F", marginTop: 6 }}>
-                    <strong>Your syllabus doesn&apos;t say:</strong>
+                    <strong>{a.rulesCard.mode === "custom" ? "Left as \"not sure\":" : "Your syllabus doesn\u2019t say:"}</strong>
                     <ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>
                       {a.rulesCard.gaps.map((g) => <li key={g}>{g}</li>)}
                     </ul>
@@ -472,6 +490,50 @@ export default function AssignmentsClient() {
                       {a.rulesCard.disclose && <div><strong>Disclosure:</strong> {a.rulesCard.disclose}</div>}
                     </div>
                   </details>
+                )}
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: colors.muted, marginBottom: 4 }}>AI rules for this assignment</div>
+                  <div role="radiogroup" aria-label="AI rules for this assignment" style={{ display: "inline-flex", border: `1px solid ${colors.cardBorder}`, borderRadius: 8, overflow: "hidden" }}>
+                    {(["syllabus", "no_ai", "custom"] as RulesMode[]).map((m, i) => {
+                      const current = a.rulesCard?.mode ?? "syllabus";
+                      const on = editingRulesId === a.id ? m === "custom" : current === m;
+                      return (
+                        <button
+                          key={m}
+                          role="radio"
+                          aria-checked={on}
+                          disabled={modeSavingId === a.id}
+                          onClick={() => (m === "custom" ? setEditingRulesId(a.id) : void setRulesMode(a, m))}
+                          style={{
+                            background: on ? "#1F1E1B" : "#fff",
+                            color: on ? "#fff" : colors.ink,
+                            border: "none",
+                            borderLeft: i ? `1px solid ${colors.cardBorder}` : "none",
+                            padding: "6px 12px",
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {RULES_MODE_LABEL[m]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                {editingRulesId === a.id && (
+                  <RulesEditor
+                    classId={Number(params.id)}
+                    assignmentId={a.id}
+                    card={a.rulesCard ?? null}
+                    onClose={() => setEditingRulesId(null)}
+                    onSaved={(rulesCard) => {
+                      setAssignments((prev) =>
+                        prev ? prev.map((x) => (x.id === a.id ? { ...x, rulesCard: rulesCard as Assignment["rulesCard"] } : x)) : prev
+                      );
+                      setEditingRulesId(null);
+                    }}
+                  />
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

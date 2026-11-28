@@ -89,7 +89,7 @@ export async function gradeIfNeeded(row: Row): Promise<{ reportCard: unknown; st
   return { reportCard, status };
 }
 
-export const MAX_REVISIONS = 2;
+export const MAX_REVISIONS = 1;
 
 /**
  * What a student sees of their own submission, only ever after they've

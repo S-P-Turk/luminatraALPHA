@@ -6,8 +6,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { callClaude } from "./ai";
 
-import { CARD_USES, type CardUse, type UseStance } from "./rules-shared";
-export { CARD_USES, type CardUse, type UseStance };
+import { CARD_USES, type CardUse, type UseStance, type RulesMode } from "./rules-shared";
+export { CARD_USES, type CardUse, type UseStance, type RulesMode };
 
 export type RulesCard = {
   // An explicit answer for each common use. Older cards may not have it.
@@ -17,7 +17,56 @@ export type RulesCard = {
   disclose: string; // how to disclose AI use; "" if the syllabus says nothing
   gaps: string[]; // for the teacher only: what the policy leaves unclear
   generatedAt: string;
+  // Set when the teacher has reviewed and saved the rules. Their answers
+  // override the syllabus wording in the analysis.
+  confirmedByTeacher?: boolean;
+  confirmedAt?: string;
+  // Which option the teacher picked; absent means "same as syllabus".
+  mode?: RulesMode;
+  // The card as read from the syllabus, kept so "same as syllabus" can
+  // restore it after a teacher picked another option.
+  fromSyllabus?: Pick<RulesCard, "uses" | "allowed" | "notAllowed" | "disclose" | "gaps" | "generatedAt">;
 };
+
+const syllabusPart = (c: RulesCard) => ({
+  uses: c.uses,
+  allowed: c.allowed,
+  notAllowed: c.notAllowed,
+  disclose: c.disclose,
+  gaps: c.gaps,
+  generatedAt: c.generatedAt,
+});
+
+/** The syllabus reading of a card, whatever the teacher picked since. */
+export function syllabusReading(card: RulesCard | null): RulesCard | null {
+  if (!card) return null;
+  if (card.fromSyllabus) return { ...card.fromSyllabus };
+  if (!card.mode || card.mode === "syllabus") return { ...syllabusPart(card) };
+  return null;
+}
+
+/** "Same as syllabus" or "No AI use allowed". */
+export function applyRulesMode(card: RulesCard | null, mode: "syllabus" | "no_ai"): RulesCard | null {
+  const base = syllabusReading(card);
+  const now = new Date().toISOString();
+  if (mode === "syllabus") {
+    return base ? { ...base, mode: "syllabus", fromSyllabus: syllabusPart(base), confirmedByTeacher: true, confirmedAt: now } : null;
+  }
+  const uses: Partial<Record<CardUse, UseStance>> = {};
+  for (const { key } of CARD_USES) uses[key] = key === "code" && base?.uses?.code === "n/a" ? "n/a" : "not_allowed";
+  return {
+    uses,
+    allowed: [],
+    notAllowed: ["Any use of AI tools on this assignment"],
+    disclose: "",
+    gaps: [],
+    generatedAt: base?.generatedAt ?? now,
+    mode: "no_ai",
+    fromSyllabus: base ? syllabusPart(base) : undefined,
+    confirmedByTeacher: true,
+    confirmedAt: now,
+  };
+}
 
 const SYSTEM_PROMPT = `You turn a course's AI-use policy into a short rules card a student can read in 20 seconds before starting one assignment.
 
@@ -128,7 +177,7 @@ export async function ensureRulesCard(assignment: {
 }): Promise<RulesCard | null> {
   const existing = assignment.rulesCard as RulesCard | null | undefined;
   // Cards written before the per-use grid existed are rewritten once.
-  if (existing && existing.uses && Object.keys(existing.uses).length > 0) return existing;
+  if (existing && ((existing.uses && Object.keys(existing.uses).length > 0) || existing.mode)) return existing;
   const { db } = await import("@/src/prisma/db");
   const { withAiContext } = await import("./ai");
   const cls = await db.orm.public.Class.where({ id: assignment.classId }).select("syllabusText").first();
@@ -142,4 +191,43 @@ export async function ensureRulesCard(assignment: {
   } catch {
     return existing ?? null;
   }
+}
+
+/** Applies a teacher's edits: their per-use answers become the rules. */
+export function confirmRules(
+  card: RulesCard | null,
+  edits: { uses: Partial<Record<CardUse, UseStance>>; disclose: string }
+): RulesCard {
+  const uses = { ...(card?.uses ?? {}), ...edits.uses };
+  const label = (k: CardUse) => CARD_USES.find((u) => u.key === k)!.label;
+  const keys = CARD_USES.map((u) => u.key).filter((k) => uses[k] && uses[k] !== "n/a");
+  return {
+    uses,
+    allowed: keys.filter((k) => uses[k] === "allowed" || uses[k] === "with_disclosure").map(label),
+    notAllowed: keys.filter((k) => uses[k] === "not_allowed").map(label),
+    disclose: edits.disclose.trim(),
+    // Questions the teacher left as "not sure" stay open; the rest are answered.
+    gaps: keys.filter((k) => uses[k] === "unclear").map((k) => `${label(k)}: left as "not sure", so it's flagged for follow-up.`),
+    generatedAt: card?.generatedAt ?? new Date().toISOString(),
+    confirmedByTeacher: true,
+    confirmedAt: new Date().toISOString(),
+    mode: "custom",
+    fromSyllabus: (() => {
+      const b = syllabusReading(card);
+      return b ? syllabusPart(b) : undefined;
+    })(),
+  };
+}
+
+/** The teacher's confirmed rules as text for the analysis prompt, or "". */
+export function confirmedRulesText(card: RulesCard | null | undefined): string {
+  // "Same as syllabus" leaves the syllabus as the authority.
+  if (!card?.confirmedByTeacher || !card.uses || !card.mode || card.mode === "syllabus") return "";
+  const lines = CARD_USES.filter((u) => card.uses![u.key] && card.uses![u.key] !== "n/a").map(
+    (u) => `- ${u.label}: ${card.uses![u.key] === "unclear" ? "not decided (treat as needing a follow-up, not a violation)" : card.uses![u.key]!.replace("_", " ")}`
+  );
+  if (card.mode === "no_ai") {
+    return `\n\n---\n\nTEACHER'S RULE FOR THIS ASSIGNMENT (overrides the syllabus): No AI use of any kind is allowed on this assignment.`;
+  }
+  return `\n\n---\n\nTEACHER-CONFIRMED AI RULES FOR THIS ASSIGNMENT (these override the syllabus wording where they differ):\n${lines.join("\n")}${card.disclose ? `\n- How to disclose: ${card.disclose}` : ""}`;
 }

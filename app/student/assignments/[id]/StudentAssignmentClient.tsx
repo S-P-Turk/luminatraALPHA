@@ -302,9 +302,9 @@ export default function StudentAssignmentClient() {
               {revising
                 ? (() => {
                     const left = submission ? submission.maxRevisions - submission.revisionsUsed - 1 : 0;
-                    return `Replace your assignment and add any new AI chat. Your teacher sees every version. ${left === 0 ? "This is your last revision." : `${left} more revision${left === 1 ? "" : "s"} after this one.`}`;
+                    return `Replace your assignment and add any new AI chat. Your teacher sees every version. ${left === 0 ? (submission && submission.maxRevisions === 1 ? "You get one resubmission, so this is it." : "This is your last revision.") : `${left} more revision${left === 1 ? "" : "s"} after this one.`}`;
                   })()
-                : "Paste your work and your AI conversation (if you used one). You'll see your score right after you submit, and you can revise before the quiz starts."}
+                : "Paste your work and your AI conversation (if you used one). You'll see your score right after you submit, and you can resubmit once before the quiz starts."}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label style={{ fontSize: 13, fontWeight: 600 }}>Your assignment</label>
@@ -595,7 +595,10 @@ function RulesCard({ rules }: { rules: Rules }) {
   return (
     <section aria-label="AI rules for this assignment" style={box}>
       <h2 style={{ ...smallHead, color: colors.accent }}>AI rules for this assignment</h2>
-      <UsesGrid uses={rules.uses} />
+      {rules.uses && Object.keys(rules.uses).length > 0 ? (
+        <UsesGrid uses={rules.uses} />
+      ) : (
+        <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: colors.green, marginBottom: 4 }}>You can use AI for</div>
@@ -614,6 +617,8 @@ function RulesCard({ rules }: { rules: Rules }) {
           )}
         </div>
       </div>
+        </>
+      )}
       {rules.disclose && (
         <p style={{ margin: 0, fontSize: 14 }}>
           <strong>Disclosing AI use:</strong> {rules.disclose}
@@ -710,10 +715,10 @@ function ResultPanel({
           onClick={onRevise}
           style={{ alignSelf: "flex-start", background: colors.ink, color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
         >
-          Revise and resubmit ({revisionsLeft} left)
+          {revisionsLeft === 1 ? "Resubmit once" : `Revise and resubmit (${revisionsLeft} left)`}
         </button>
       ) : (
-        revisionsLeft <= 0 && <div style={{ fontSize: 13, color: colors.muted }}>No revisions left.</div>
+        revisionsLeft <= 0 && <div style={{ fontSize: 13, color: colors.muted }}>You&rsquo;ve used your resubmission.</div>
       )}
     </section>
   );

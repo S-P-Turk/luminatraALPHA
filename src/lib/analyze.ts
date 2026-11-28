@@ -8,6 +8,7 @@ import { scoreSubmission } from "./scoring";
 import { withAiContext } from "./ai";
 import { nextStatus } from "./grading";
 import { redact, restore } from "./redact";
+import { confirmedRulesText, type RulesCard } from "./rules";
 
 export const ANALYZING = "analyzing";
 export const ANALYSIS_FAILED = "analysis_failed";
@@ -22,7 +23,7 @@ export async function analyzeSubmission(submissionId: number): Promise<void> {
   // The class syllabus is the source of AI-use rules; the assignment's own
   // instructions tell the model what this particular piece of work asked
   // for, so the comprehension quiz can target the right claims.
-  const policy = `COURSE SYLLABUS / AI-USE POLICY:\n${cls.syllabusText}\n\n---\n\nTHIS ASSIGNMENT'S INSTRUCTIONS:\n${assignment.title}\n${assignment.instructions}`;
+  const policy = `COURSE SYLLABUS / AI-USE POLICY:\n${cls.syllabusText}\n\n---\n\nTHIS ASSIGNMENT'S INSTRUCTIONS:\n${assignment.title}\n${assignment.instructions}${confirmedRulesText(assignment.rulesCard as RulesCard | null)}`;
 
   try {
     // The student's name and email never leave our servers.

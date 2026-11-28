@@ -100,7 +100,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/student/ass
       : assignment.quizOpen || existing.quizAnswers != null
         ? "The quiz has started, so this submission can't be revised now."
         : priorRevisions.length >= MAX_REVISIONS
-          ? `You've used all ${MAX_REVISIONS} revisions for this assignment.`
+          ? MAX_REVISIONS === 1 ? "You've already used your one resubmission." : `You've used all ${MAX_REVISIONS} revisions for this assignment.`
           : null;
   if (blocked) {
     return NextResponse.json({ error: blocked, submission: forStudent(existing) }, { status: 409 });

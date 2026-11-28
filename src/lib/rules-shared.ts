@@ -11,3 +11,18 @@ export const CARD_USES: { key: CardUse; label: string }[] = [
   { key: "code", label: "Writing or fixing code" },
 ];
 
+
+export const STANCE_LABEL: Record<UseStance, string> = {
+  allowed: "Allowed",
+  with_disclosure: "Allowed if disclosed",
+  not_allowed: "Not allowed",
+  unclear: "Not sure: flag for follow-up",
+  "n/a": "Doesn't apply",
+};
+
+export type RulesMode = "syllabus" | "no_ai" | "custom";
+export const RULES_MODE_LABEL: Record<RulesMode, string> = {
+  syllabus: "Same as syllabus",
+  no_ai: "No AI use allowed",
+  custom: "Custom",
+};

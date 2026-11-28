@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentTeacher } from "@/src/lib/current-teacher";
-import { ensureRulesCard } from "@/src/lib/rules";
+import { ensureRulesCard, confirmRules, applyRulesMode, CARD_USES, type RulesCard, type UseStance, type CardUse } from "@/src/lib/rules";
 
 export async function PATCH(
   request: Request,
@@ -34,6 +34,39 @@ export async function PATCH(
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Expected JSON body." }, { status: 400 });
+  }
+
+  // Teacher picking "same as syllabus" or "no AI use allowed": { rulesMode }
+  const modeRaw = (body as { rulesMode?: unknown })?.rulesMode;
+  if (modeRaw === "syllabus" || modeRaw === "no_ai") {
+    let current = (assignment.rulesCard ?? null) as RulesCard | null;
+    // No syllabus reading saved yet: write one first.
+    if (modeRaw === "syllabus" && !current?.fromSyllabus && current?.mode && current.mode !== "syllabus") current = null;
+    if (!current) current = await ensureRulesCard({ ...assignment, rulesCard: null });
+    const rulesCard = applyRulesMode(current, modeRaw);
+    if (!rulesCard) return NextResponse.json({ error: "Couldn't read the syllabus rules. Try again." }, { status: 502 });
+    const updated = await db.orm.public.Assignment.where({ id: assignmentId }).update({ rulesCard });
+    return NextResponse.json({ assignment: { ...updated, rulesCard } });
+  }
+
+  // Teacher adjusting the AI rules ("custom"): { rules: { uses: {...}, disclose: "..." } }
+  const rulesRaw = (body as { rules?: { uses?: Record<string, unknown>; disclose?: unknown } })?.rules;
+  if (rulesRaw && typeof rulesRaw === "object") {
+    const STANCES: UseStance[] = ["allowed", "with_disclosure", "not_allowed", "unclear", "n/a"];
+    const uses: Partial<Record<CardUse, UseStance>> = {};
+    for (const { key } of CARD_USES) {
+      const v = rulesRaw.uses?.[key];
+      if (v !== undefined) {
+        if (typeof v !== "string" || !STANCES.includes(v as UseStance)) {
+          return NextResponse.json({ error: `Invalid answer for ${key}.` }, { status: 400 });
+        }
+        uses[key] = v as UseStance;
+      }
+    }
+    const disclose = typeof rulesRaw.disclose === "string" ? rulesRaw.disclose.slice(0, 300) : "";
+    const rulesCard = confirmRules((assignment.rulesCard ?? null) as RulesCard | null, { uses, disclose });
+    const updated = await db.orm.public.Assignment.where({ id: assignmentId }).update({ rulesCard });
+    return NextResponse.json({ assignment: { ...updated, rulesCard } });
   }
 
   const openRaw = (body as { open?: unknown })?.open;
