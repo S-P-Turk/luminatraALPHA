@@ -32,6 +32,10 @@ type Result = {
 
 type Rules = { uses?: Partial<Record<CardUse, UseStance>>; allowed: string[]; notAllowed: string[]; disclose: string };
 
+// Sent as the transcript when a student clicks "No AI submission". The
+// analysis recognizes it (noAiUsed) and scores without a model call.
+const NO_AI_TRANSCRIPT = 'No AI used for this assignment (the student clicked "No AI submission").';
+
 const SIGNAL_NAME = { comprehension: "Comprehension quiz", reliance: "AI reliance", policy: "Course AI rules" } as const;
 const LEVEL_NAME: Record<string, string> = {
   ideas: "built on AI ideas",
@@ -97,6 +101,7 @@ function AssignmentView({ id }: { id: string }) {
 
   const [assignmentText, setAssignmentText] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [noAi, setNoAi] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [revising, setRevising] = useState(false);
   const [addedTranscript, setAddedTranscript] = useState("");
@@ -181,7 +186,7 @@ function AssignmentView({ id }: { id: string }) {
       const res = await fetch(`/api/student/assignments/${params.id}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(revising ? { assignmentText, addedTranscript } : { assignmentText, transcript }),
+        body: JSON.stringify(revising ? { assignmentText, addedTranscript } : { assignmentText, transcript: noAi ? NO_AI_TRANSCRIPT : transcript }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -369,15 +374,42 @@ function AssignmentView({ id }: { id: string }) {
               </>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ fontSize: 13, fontWeight: 600 }}>AI conversation transcript</label>
-                <textarea
-                  required
-                  rows={10}
-                  value={transcript}
-                  onChange={(e) => setTranscript(e.target.value)}
-                  placeholder="Paste your AI chat transcript, or write 'I did not use AI for this assignment.'"
-                  style={inputStyle}
-                />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <label htmlFor="transcript" style={{ fontSize: 13, fontWeight: 600 }}>AI conversation transcript</label>
+                  <button
+                    type="button"
+                    aria-pressed={noAi}
+                    onClick={() => setNoAi((v) => !v)}
+                    style={{
+                      background: noAi ? colors.ink : "#fff",
+                      color: noAi ? "#fff" : colors.ink,
+                      border: `1px solid ${noAi ? colors.ink : colors.cardBorder}`,
+                      borderRadius: 8,
+                      padding: "6px 12px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {noAi ? "✓ No AI submission" : "No AI submission"}
+                  </button>
+                </div>
+                {noAi ? (
+                  <p style={{ margin: 0, fontSize: 13, color: colors.muted, background: "#F3F1EC", borderRadius: 8, padding: "10px 12px" }}>
+                    You&apos;re submitting without an AI conversation, which tells your teacher you didn&apos;t use AI for this
+                    assignment. If you used any AI tool, click the button again and paste the chat.
+                  </p>
+                ) : (
+                  <textarea
+                    id="transcript"
+                    required
+                    rows={10}
+                    value={transcript}
+                    onChange={(e) => setTranscript(e.target.value)}
+                    placeholder="Paste your full AI chat here. Didn't use AI? Click “No AI submission”."
+                    style={inputStyle}
+                  />
+                )}
               </div>
             )}
 
