@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Spinner, WorkingNote } from "@/src/components/Spinner";
+import { Spinner, WorkingNote, AnalyzingCard } from "@/src/components/Spinner";
 import { toast } from "@/src/components/Toaster";
 import { UsesGrid } from "@/src/components/UsesGrid";
 import type { CardUse, UseStance } from "@/src/lib/rules-shared";
@@ -382,9 +382,7 @@ export default function StudentAssignmentClient() {
         )}
 
         {submission?.status === "analyzing" && !revising && (
-          <div style={{ background: "#fff", border: `1px solid ${colors.border}`, borderRadius: 10, padding: "16px 18px" }}>
-            <WorkingNote message="Analyzing your submission…" hint="Usually 20–40 seconds. You can leave this page; your result will be here when you come back." />
-          </div>
+          <AnalyzingCard />
         )}
 
         {submission?.status === "analysis_failed" && !revising && (
@@ -427,6 +425,15 @@ export default function StudentAssignmentClient() {
           >
             <strong>Next:</strong> your teacher will start a 2-question quiz (one sentence each). Come back here when
             they do.
+          </div>
+        )}
+
+        {submission && submission.quiz && !submission.quizAnswers && detail?.assignment.quizOpen && submission.quiz.quiz.length === 0 && (
+          <div style={{ background: "#fff", border: `1px solid ${colors.border}`, borderRadius: 10, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <WorkingNote message="Preparing your quiz…" hint="This takes a few seconds." />
+            <button type="button" onClick={() => void load()} style={{ alignSelf: "flex-start", background: colors.ink, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              Check again
+            </button>
           </div>
         )}
 

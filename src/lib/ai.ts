@@ -21,11 +21,26 @@ export type Step = "analysis" | "grading" | "suggestions" | "lab" | "eval" | "ru
 
 // Estimated price per million tokens. Override with env vars if the model's
 // real pricing differs; the spending page shows these as estimates.
-export const PRICE_IN = Number(process.env.AI_PRICE_INPUT_PER_MTOK ?? 3);
-export const PRICE_OUT = Number(process.env.AI_PRICE_OUTPUT_PER_MTOK ?? 15);
+// USD per million tokens, from platform.claude.com/docs/en/about-claude/pricing
+// (Nov 2026). Haiku 5.5 doubles above 100k prompt tokens; our prompts are far
+// smaller. Env overrides apply to the main analysis model only.
+export const MODELS = { main: "claude-sonnet-5", fast: "claude-haiku-5-5" } as const;
+const PRICES: Record<string, { in: number; out: number }> = {
+  "claude-sonnet-5": { in: 2, out: 10 },
+  "claude-sonnet-5-5": { in: 2, out: 10 },
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
+};
+export const PRICE_IN = Number(process.env.AI_PRICE_INPUT_PER_MTOK ?? PRICES[MODELS.main].in);
+export const PRICE_OUT = Number(process.env.AI_PRICE_OUTPUT_PER_MTOK ?? PRICES[MODELS.main].out);
 
-export function costOf(inputTokens: number, outputTokens: number): number {
-  return (inputTokens * PRICE_IN + outputTokens * PRICE_OUT) / 1_000_000;
+function priceFor(model: string) {
+  if (model === MODELS.main) return { in: PRICE_IN, out: PRICE_OUT };
+  return PRICES[model] ?? { in: PRICE_IN, out: PRICE_OUT };
+}
+
+export function costOf(inputTokens: number, outputTokens: number, model: string = MODELS.main): number {
+  const p = priceFor(model);
+  return (inputTokens * p.in + outputTokens * p.out) / 1_000_000;
 }
 
 // Context set by callers (e.g. "this is the test lab", "for class 3") so
@@ -141,7 +156,8 @@ export async function callClaude(
   const outputTokens = u?.output_tokens ?? 0;
   // Cache writes bill at 1.25x input, cache reads at 0.1x.
   const costUsd =
-    costOf(u?.input_tokens ?? 0, outputTokens) + ((cacheWrite * 1.25 + cacheRead * 0.1) * PRICE_IN) / 1_000_000;
+    costOf(u?.input_tokens ?? 0, outputTokens, params.model) +
+    ((cacheWrite * 1.25 + cacheRead * 0.1) * priceFor(params.model).in) / 1_000_000;
   try {
     const db = await getDb();
     if (db) await db.orm.public.ApiCall.create({

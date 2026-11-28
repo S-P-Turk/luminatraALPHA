@@ -23,8 +23,8 @@ Live: https://luminatra-alpha.vercel.app (admin at `/admin`). Vercel deploys eve
 
 ## Architecture
 
-- `src/lib/ai.ts` `callClaude(step, params)`: every Claude call goes through it. Model `claude-sonnet-5`. Logs tokens/cost to `ApiCall` (cache tokens counted), enforces the monthly budget hard stop (`AdminSetting` monthlyBudget/alertAt/hardStop), prompt caching on system prompts, `withAiContext({step, classId})`.
-- `src/lib/analyze.ts`: background analysis after submit (`after()` from next/server). Status `analyzing` → scored, or `analysis_failed` (student can retry without using a revision). Student page polls every 3 s.
+- `src/lib/ai.ts` `callClaude(step, params)`: every Claude call goes through it. `MODELS.main` = `claude-sonnet-5` (analysis, quiz questions), `MODELS.fast` = `claude-haiku-5-5` (rules cards, quiz grading). Per-model pricing: Sonnet 5 $2/$10, Haiku 5.5 $0.10/$0.50 per MTok (before 2026-11-28 the app logged $3/$15, so older ApiCall costs are ~50% high). Logs tokens/cost to `ApiCall` (cache tokens counted), enforces the monthly budget hard stop (`AdminSetting` monthlyBudget/alertAt/hardStop), prompt caching on system prompts, `withAiContext({step, classId})`.
+- `src/lib/analyze.ts`: background analysis after submit (`after()` from next/server). Score first, quiz later: `analyzeSubmission` (tool `submit_analysis`, no quiz) sets the score, then `writeQuizQuestions` (tool `submit_questions`) fills the 2 questions. If they're missing when the quiz opens, the student GET route calls `ensureQuizQuestions`. No-AI fast path: `noAiUsed(transcript)` skips the model entirely. Status `analyzing` → scored, or `analysis_failed` (student can retry without using a revision). Student page polls every 3 s and shows `AnalyzingCard` (steps + "Please don't close this page").
 - `src/lib/quiz.ts` (generateQuiz, gradeAnswers), `grading.ts` (gradeIfNeeded, nextStatus, forStudent, MAX_REVISIONS), `scoring.ts`, `reliance.ts`, `contribution.ts`, `rules.ts`, `redact.ts`.
 - Prisma 8 contract ORM: schema in `src/prisma/contract.prisma`; regenerate with `npx prisma contract emit`; deploy runs `prisma db update --yes`. Query style: `db.orm.public.Model.where({...}).select(...).first()/all()/update()/create()`.
 - Teacher review pages grade waiting quiz answers in parallel (`app/api/review`, `app/api/classes/[id]/submissions`).
@@ -47,7 +47,7 @@ Claude Code itself runs on the founder's claude.ai login and needs no API key. O
 1. `npx tsx scripts/eval/eval-rules.ts real-` and fix any "too lenient" errors (card allows what the syllabus forbids).
 2. Run the full 36-case test set against the real model; confirm v3.1 and the new student result view.
 3. One live end-to-end pass on the deployed site: teacher creates assignment → rules card + gaps → student submits → score + levers → revise with added chat → activate quiz → teacher review.
-4. Speed: shorten model output (pointer to matched AI text instead of full excerpts twice) and Haiku for quiz grading / rules cards; rerun the test set before and after.
+4. Speed work shipped 2026-11-28 (split analysis, no-AI fast path, AI source text once, Haiku for rules/grading). Rerun the rules check and the full test set to confirm Haiku didn't cost accuracy; if rules accuracy drops, move `generateRulesCard` back to `MODELS.main`.
 5. Pilot prep: one-page data-handling statement, student guide for pasting AI chats, ask the pilot school whether a data privacy agreement is required (decides Bedrock vs current setup).
 
 Backlog ideas the founder picked: "who said it first" (idea provenance in the transcript), "solid vs shaky flags" (rerun near the 40 line and label stability). Founder does the adversarial test set himself.

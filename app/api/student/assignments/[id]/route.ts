@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { forStudent } from "@/src/lib/grading";
+import { ensureQuizQuestions } from "@/src/lib/analyze";
 import { ensureRulesCard, rulesForStudent } from "@/src/lib/rules";
+
+export const maxDuration = 60;
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/student/assignments/[id]">) {
   const session = await getCurrentStudentSession();
@@ -33,9 +36,21 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/ass
     .select("id", "name")
     .first();
 
-  const submission = await db.orm.public.Submission
+  let submission = await db.orm.public.Submission
     .where({ assignmentId: id, studentEmail: session.email })
     .first();
+
+  // The quiz is written after the score. If the teacher has opened the quiz
+  // and the questions aren't there yet, write them now.
+  const questions = (submission?.quiz as { quiz?: unknown[] } | null)?.quiz;
+  if (submission && assignment.quizOpen && submission.status !== "analyzing" && submission.quiz && !(Array.isArray(questions) && questions.length)) {
+    try {
+      await ensureQuizQuestions(submission.id);
+      submission = await db.orm.public.Submission.where({ id: submission.id }).first();
+    } catch {
+      // The page shows "preparing your quiz" and tries again on the next load.
+    }
+  }
 
   // Don't send the quiz questions until the teacher activates the quiz, so
   // students can't read them ahead of time.

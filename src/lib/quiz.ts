@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { callClaude } from "./ai";
-import { numberedParagraphs } from "./paragraphs";
+import { callClaude, MODELS } from "./ai";
+import { numberedParagraphs, splitParagraphs } from "./paragraphs";
 
 
 // Kept identical in spirit to the original app/api/generate-quiz prototype
@@ -17,8 +17,7 @@ Your job, in order:
 
 2. Read the transcript and determine which parts of the assignment the student claims the AI helped with, and which parts they claim they did themselves (independent reasoning, writing, or sourcing).
 
-3. Generate exactly 2 quiz questions that test the student's understanding specifically of the parts they claim were NOT AI-assisted. Don't pick these at random — pick the two spots in the claimed-unassisted work that are most likely to expose a real gap: a specific fact, number, or reasoning step that would be hard to answer correctly unless the student actually did that work themselves. If an outside source is mentioned in the transcript as something the student found/used themselves, strongly prefer a question asking what that specific source actually argues over a generic content question — misrepresented sourcing is the easiest gap to catch. A student who actually did the claimed-unassisted work should be able to answer both quickly and specifically; a student who faked the transcript to hide AI use will struggle on at least one.
-   - Both questions must be answerable correctly in one sentence each. Ask short, specific questions — a student who did the work should answer each in a single sentence.
+3. (The comprehension quiz is written separately; don't write questions here.)
 
 4. Only report a policy_concern if the transcript affirmatively shows the AI being used in a way the syllabus doesn't allow — for example, the syllabus bans AI drafting but the transcript shows the AI writing full sentences or paragraphs that plausibly ended up in the submission, or the syllabus requires disclosure and the transcript shows AI help the student didn't disclose elsewhere. Never flag a concern just because the transcript doesn't prove the student met some other requirement (number of sources, word count, formatting, etc.) — those aren't AI-use questions, they're separate grading matters outside what this tool checks, and "I can't verify this from the transcript" is not evidence of a violation. If you don't see a clear, transcript-evidenced AI-use violation, report policy_concern as an empty string.
 
@@ -26,7 +25,7 @@ Your job, in order:
 
 6. If the submitted work is provided, map where AI contributed to it. In ai_passages, list every passage of the submitted work that derives from an AI reply in the transcript. For each:
    - submission_excerpt: copied EXACTLY, character for character, from the submitted work (at least 8 words; split long passages into separate entries of up to ~60 words).
-   - transcript_excerpt: the AI reply text it came from, copied EXACTLY from the transcript (the relevant sentence or two, up to ~80 words).
+   - Don't copy the AI source text here: it goes once, in that paragraph's ai_source_excerpt (step 8), and is matched up automatically.
    - kind: "verbatim" if the AI's wording was copied as-is or with trivial edits (punctuation, a word or two); "paraphrased" if the passage clearly follows the AI reply's specific wording and structure but was reworded; "edited" if the student wrote the text first (it appears in the student's own message) and the AI only corrected or polished it.
    - claimed_as_own: true if the student presents that part as their own work or doesn't disclose the AI's role; false if they openly disclosed that AI wrote or helped write it.
    Only use the AI's replies as sources — never text the student typed into the chat. Don't include passages that merely share a topic, facts, or ideas with an AI reply; brainstormed ideas the student wrote up in their own words are the student's writing. If there are none, return an empty list. Excerpts are verified mechanically against the submission and transcript, so never paraphrase them.
@@ -41,9 +40,21 @@ Your job, in order:
    Cite the complete AI sentence(s) the paragraph draws on as ai_source_excerpt — the source is measured against the paragraph to confirm the level.
    For each, give index, reliance, disclosed (true only if the student openly said AI did this), a note (under 15 words, e.g. "Argument about hyperinflation comes from the AI's explanation."), and ai_source_excerpt: the AI reply text it came from, copied EXACTLY from the transcript (empty string for "none"). Only AI replies count as sources, never the student's own messages. A rating above "none" with no real source in the transcript is not allowed.
 
-Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) describing what in the transcript a teacher should follow up on and which rule it relates to. Never state a conclusion or accuse — the teacher decides; you only point to what is worth a closer look. what_it_tests is a few words. No hedging, no restating the syllabus.
+Keep everything short and plain — a busy teacher reads this in seconds. policy_summary is one sentence (under 20 words). policy_concern, when present, is one sentence (under 25 words) describing what in the transcript a teacher should follow up on and which rule it relates to. Never state a conclusion or accuse — the teacher decides; you only point to what is worth a closer look. No hedging, no restating the syllabus.
 
-Report your findings using the submit_quiz tool. Don't write any other text.`;
+Report your findings using the submit_analysis tool. Don't write any other text.`;
+
+// The comprehension quiz, written in its own call after the score is out, so
+// students see their score without waiting for it.
+const QUESTIONS_PROMPT = `You are part of an academic integrity tool. A student submitted work along with the transcript of their AI conversation(s), under the course syllabus's AI rules.
+
+1. From the transcript, determine which parts of the assignment the student claims they did themselves (independent reasoning, writing, or sourcing). List them in claimed_unassisted_areas (short phrases).
+
+2. Write exactly 2 quiz questions that test the student's understanding specifically of the parts they claim were NOT AI-assisted. Don't pick these at random — pick the two spots in the claimed-unassisted work that are most likely to expose a real gap: a specific fact, number, or reasoning step that would be hard to answer correctly unless the student actually did that work themselves. If an outside source is mentioned in the transcript as something the student found/used themselves, strongly prefer a question asking what that specific source actually argues over a generic content question — misrepresented sourcing is the easiest gap to catch. A student who actually did the claimed-unassisted work should be able to answer both quickly and specifically; a student who faked the transcript to hide AI use will struggle on at least one.
+   - Both questions must be answerable correctly in one sentence each. Ask short, specific questions.
+   - what_it_tests is a few words.
+
+Report using the submit_questions tool. Don't write any other text.`;
 
 export type AiPassage = {
   submission_excerpt: string;
@@ -78,9 +89,9 @@ export type QuizResult = {
 // text — the API enforces schema-valid output this way. The earlier
 // prompted-JSON version would occasionally break JSON.parse when the model's
 // own text contained an unescaped quote or got cut off mid-string.
-const QUIZ_TOOL: Anthropic.Tool = {
-  name: "submit_quiz",
-  description: "Report the policy analysis and comprehension quiz for this submission.",
+const ANALYSIS_TOOL: Anthropic.Tool = {
+  name: "submit_analysis",
+  description: "Report the policy analysis and AI reliance for this submission.",
   input_schema: {
     type: "object",
     properties: {
@@ -95,16 +106,15 @@ const QUIZ_TOOL: Anthropic.Tool = {
       policy_severity: { type: "string", enum: ["none", "minor", "clear"] },
       ai_passages: {
         type: "array",
-        description: "Passages of the submitted work that derive from AI replies, each with its source AI text.",
+        description: "Passages of the submitted work that derive from AI replies.",
         items: {
           type: "object",
           properties: {
             submission_excerpt: { type: "string" },
-            transcript_excerpt: { type: "string" },
             kind: { type: "string", enum: ["verbatim", "paraphrased", "edited"] },
             claimed_as_own: { type: "boolean" },
           },
-          required: ["submission_excerpt", "transcript_excerpt", "kind", "claimed_as_own"],
+          required: ["submission_excerpt", "kind", "claimed_as_own"],
         },
       },
       usage_summary: { type: "string", description: "One plain sentence on how the student used AI overall." },
@@ -123,6 +133,17 @@ const QUIZ_TOOL: Anthropic.Tool = {
           required: ["index", "reliance", "disclosed", "note", "ai_source_excerpt"],
         },
       },
+    },
+    required: ["policy_summary", "policy_concern", "policy_severity", "ai_passages", "usage_summary", "paragraphs"],
+  },
+};
+
+const QUESTIONS_TOOL: Anthropic.Tool = {
+  name: "submit_questions",
+  description: "Report the comprehension quiz for this submission.",
+  input_schema: {
+    type: "object",
+    properties: {
       claimed_unassisted_areas: {
         type: "array",
         items: { type: "string" },
@@ -143,48 +164,83 @@ const QUIZ_TOOL: Anthropic.Tool = {
         },
       },
     },
-    required: [
-      "policy_summary",
-      "policy_concern",
-      "policy_severity",
-      "ai_passages",
-      "usage_summary",
-      "paragraphs",
-      "claimed_unassisted_areas",
-      "quiz",
-    ],
+    required: ["claimed_unassisted_areas", "quiz"],
   },
 };
 
-export async function generateQuiz(transcript: string, syllabus: string, submissionText?: string): Promise<QuizResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("Server is missing ANTHROPIC_API_KEY.");
-  }
+const userContent = (transcript: string, syllabus: string, submissionText?: string) =>
+  `SYLLABUS:\n${syllabus}\n\n---\n\nAI TRANSCRIPT:\n${transcript}` +
+  (submissionText
+    ? `\n\n---\n\nSUBMITTED WORK (paragraphs numbered for the reliance ratings; the numbers are not part of the text):\n${numberedParagraphs(submissionText)}`
+    : "");
 
+const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Each AI passage's source text is written once, in its paragraph's
+ * ai_source_excerpt, instead of twice. Fill it back in for the contribution map.
+ */
+export function fillPassageSources(analysis: QuizResult, submissionText?: string): QuizResult {
+  if (!submissionText || !analysis.ai_passages?.length) return analysis;
+  const paras = splitParagraphs(submissionText);
+  const byIndex = new Map((analysis.paragraphs ?? []).map((p) => [p.index, p.ai_source_excerpt]));
+  return {
+    ...analysis,
+    ai_passages: analysis.ai_passages.map((a) => {
+      if (a.transcript_excerpt) return a;
+      const ex = norm(a.submission_excerpt);
+      const home = paras.find((p) => norm(p.text).includes(ex.slice(0, 80)));
+      const src = home ? byIndex.get(home.index) : undefined;
+      return src ? { ...a, transcript_excerpt: src } : a;
+    }),
+  };
+}
+
+/** Policy, AI reliance and passages: everything the score needs. No quiz. */
+export async function analyzeSubmission(transcript: string, syllabus: string, submissionText?: string): Promise<QuizResult> {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error("Server is missing ANTHROPIC_API_KEY.");
   const message = await callClaude("analysis", {
-    model: "claude-sonnet-5",
-    max_tokens: 4096,
+    model: MODELS.main,
+    max_tokens: 3000,
     system: SYSTEM_PROMPT,
-    tools: [QUIZ_TOOL],
-    tool_choice: { type: "tool", name: "submit_quiz" },
-    messages: [
-      {
-        role: "user",
-        content:
-          `SYLLABUS:\n${syllabus}\n\n---\n\nAI TRANSCRIPT:\n${transcript}` +
-          (submissionText
-            ? `\n\n---\n\nSUBMITTED WORK (paragraphs numbered for the reliance ratings; the numbers are not part of the text):\n${numberedParagraphs(submissionText)}`
-            : ""),
-      },
-    ],
+    tools: [ANALYSIS_TOOL],
+    tool_choice: { type: "tool", name: "submit_analysis" },
+    messages: [{ role: "user", content: userContent(transcript, syllabus, submissionText) }],
   });
+  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_analysis");
+  if (!toolUse || toolUse.type !== "tool_use") throw new Error("The analysis didn't return a structured result. Try again.");
+  const analysis = { ...(toolUse.input as QuizResult), claimed_unassisted_areas: [], quiz: [] };
+  return fillPassageSources(analysis, submissionText);
+}
 
-  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_quiz");
-  if (!toolUse || toolUse.type !== "tool_use") {
-    throw new Error("The quiz generator didn't return a structured result. Try again.");
-  }
+/** The two comprehension questions, written after the score is out. */
+export async function writeQuizQuestions(
+  transcript: string,
+  syllabus: string,
+  submissionText?: string
+): Promise<Pick<QuizResult, "claimed_unassisted_areas" | "quiz">> {
+  if (!process.env.ANTHROPIC_API_KEY) throw new Error("Server is missing ANTHROPIC_API_KEY.");
+  const message = await callClaude("analysis", {
+    model: MODELS.main,
+    max_tokens: 800,
+    system: QUESTIONS_PROMPT,
+    tools: [QUESTIONS_TOOL],
+    tool_choice: { type: "tool", name: "submit_questions" },
+    messages: [{ role: "user", content: userContent(transcript, syllabus, submissionText) }],
+  });
+  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_questions");
+  if (!toolUse || toolUse.type !== "tool_use") throw new Error("The quiz writer didn't return a structured result.");
+  const r = toolUse.input as Pick<QuizResult, "claimed_unassisted_areas" | "quiz">;
+  return { claimed_unassisted_areas: r.claimed_unassisted_areas ?? [], quiz: r.quiz ?? [] };
+}
 
-  return toolUse.input as QuizResult;
+/** Both, in parallel. Used by the test set and the admin lab. */
+export async function generateQuiz(transcript: string, syllabus: string, submissionText?: string): Promise<QuizResult> {
+  const [analysis, questions] = await Promise.all([
+    analyzeSubmission(transcript, syllabus, submissionText),
+    writeQuizQuestions(transcript, syllabus, submissionText),
+  ]);
+  return { ...analysis, ...questions };
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +303,7 @@ export async function gradeAnswers(input: {
     .join("\n\n");
 
   const message = await callClaude("grading", {
-    model: "claude-sonnet-5",
+    model: MODELS.fast,
     max_tokens: 1024,
     system: GRADE_SYSTEM_PROMPT,
     tools: [GRADE_TOOL],

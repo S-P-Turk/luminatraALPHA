@@ -4,7 +4,7 @@
 // the wording before anyone is flagged over an ambiguity.
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { callClaude } from "./ai";
+import { callClaude, MODELS } from "./ai";
 
 import { CARD_USES, type CardUse, type UseStance, type RulesMode } from "./rules-shared";
 export { CARD_USES, type CardUse, type UseStance, type RulesMode };
@@ -125,7 +125,7 @@ export async function generateRulesCard(input: {
 }): Promise<RulesCard> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("Server is missing ANTHROPIC_API_KEY.");
   const message = await callClaude("rules", {
-    model: "claude-sonnet-5",
+    model: MODELS.fast,
     max_tokens: 1000,
     system: SYSTEM_PROMPT,
     tools: [TOOL],
