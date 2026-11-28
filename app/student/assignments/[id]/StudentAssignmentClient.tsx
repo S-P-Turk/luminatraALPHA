@@ -513,7 +513,7 @@ function AssignmentView({ id }: { id: string }) {
             <div>
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>Quick comprehension check</h2>
               <p style={{ margin: 0, fontSize: 13, color: colors.muted }}>
-                Answer in your own words — this is about the parts of the work you said you did yourself.
+                One sentence each, in your own words. Each question is about something you wrote.
               </p>
             </div>
             {submission.quiz.quiz.map((q, i) => (
@@ -521,12 +521,12 @@ function AssignmentView({ id }: { id: string }) {
                 <label style={{ fontSize: 13, fontWeight: 600 }}>
                   {i + 1}. {q.question}{" "}
                   <span style={{ fontWeight: 400, color: colors.muted }}>
-                    ({q.expected_length === "two_sentences" ? "answer in two sentences" : "answer in one sentence"})
+                    (answer in one sentence)
                   </span>
                 </label>
                 <textarea
                   required
-                  rows={q.expected_length === "two_sentences" ? 2 : 1}
+                  rows={2}
                   value={answers[i] ?? ""}
                   onChange={(e) =>
                     setAnswers((prev) => {
@@ -537,6 +537,9 @@ function AssignmentView({ id }: { id: string }) {
                   }
                   style={inputStyle}
                 />
+                {(answers[i] ?? "").trim().split(/(?<=[.!?])\s+(?=\S)/).filter(Boolean).length > 1 && (
+                  <span style={{ fontSize: 12, color: colors.amber }}>One sentence is enough. Keep just the main point.</span>
+                )}
               </div>
             ))}
             {savingAnswers && <WorkingNote message="Checking your answers…" hint="About 10–20 seconds." />}

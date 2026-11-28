@@ -46,12 +46,18 @@ Report your findings using the submit_analysis tool. Don't write any other text.
 
 // The comprehension quiz, written in its own call after the score is out, so
 // students see their score without waiting for it.
-const QUESTIONS_PROMPT = `You are part of an academic integrity tool. A student submitted work along with the transcript of their AI conversation(s), under the course syllabus's AI rules.
+const QUESTIONS_PROMPT = `You are part of an academic integrity tool. A student submitted work along with the transcript of their AI conversation(s), under the course syllabus's AI rules. You write a 2-question comprehension check that a student who really did the work answers easily and a student who didn't struggles with.
 
-1. From the transcript, determine which parts of the assignment the student claims they did themselves (independent reasoning, writing, or sourcing). List them in claimed_unassisted_areas (short phrases).
+1. From the transcript, determine which parts of the work the student did themselves (not taken from an AI reply). List them in claimed_unassisted_areas (short phrases). If no AI was used, that is the whole submission.
 
-2. Write exactly 2 quiz questions that test the student's understanding specifically of the parts they claim were NOT AI-assisted. Don't pick these at random — pick the two spots in the claimed-unassisted work that are most likely to expose a real gap: a specific fact, number, or reasoning step that would be hard to answer correctly unless the student actually did that work themselves. If an outside source is mentioned in the transcript as something the student found/used themselves, strongly prefer a question asking what that specific source actually argues over a generic content question — misrepresented sourcing is the easiest gap to catch. A student who actually did the claimed-unassisted work should be able to answer both quickly and specifically; a student who faked the transcript to hide AI use will struggle on at least one.
-   - Both questions must be answerable correctly in one sentence each. Ask short, specific questions.
+2. Write exactly 2 questions. Rules for each question:
+   - It is about ONE specific numbered paragraph of the submitted work, from the parts the student did themselves. Set paragraph to that number. Use two different paragraphs when there are two or more.
+   - Target the most specific thing in that paragraph that only its author would know: a reasoning step ("why does X lead to Y in your argument"), a concrete detail, number, name or example they used, or what a source they cite actually says. Prefer the paragraph's key claim over a side detail.
+   - It has ONE correct answer, found in the student's own paragraph (or in the source that paragraph cites). Write that answer in answer_key: one sentence, in plain words, taken from what the student wrote.
+   - The student must be able to answer in ONE sentence. Ask one thing only: no two-part questions, no "and why", no lists.
+   - Never hypothetical or opinion: no "what would you", "how might you", "do you think", "if you were", "what would you change", "what else could", no questions about what they would research, verify or do next. Every question asks about what the student already wrote.
+   - Not answerable from general knowledge or by restating the assignment prompt: a student who skipped the work and only knows the topic should get it wrong.
+   - Short and plain: under 30 words. Refer to the paragraph by its content ("In your paragraph about the reparations, …"), never by its number, since the student doesn't see numbers.
    - what_it_tests is a few words.
 
 Report using the submit_questions tool. Don't write any other text.`;
@@ -82,7 +88,16 @@ export type QuizResult = {
   // Added with AI reliance (scoring v3); absent on older analyses.
   paragraphs?: ParagraphReliance[];
   claimed_unassisted_areas: string[];
-  quiz: { question: string; expected_length: "one_sentence" | "two_sentences"; what_it_tests: string }[];
+  quiz: QuizQuestion[];
+};
+
+export type QuizQuestion = {
+  question: string;
+  expected_length: "one_sentence" | "two_sentences";
+  what_it_tests: string;
+  // Added with answer keys; absent on older quizzes. Never sent to students.
+  paragraph?: number;
+  answer_key?: string;
 };
 
 // Structured as a forced tool call rather than "respond with JSON" prompted
@@ -156,11 +171,12 @@ const QUESTIONS_TOOL: Anthropic.Tool = {
         items: {
           type: "object",
           properties: {
-            question: { type: "string" },
-            expected_length: { type: "string", enum: ["one_sentence", "two_sentences"] },
+            paragraph: { type: "integer", description: "The numbered paragraph this question is about." },
+            question: { type: "string", description: "Under 30 words, one thing, answerable in one sentence." },
+            answer_key: { type: "string", description: "The correct answer in one sentence, from the student's own paragraph." },
             what_it_tests: { type: "string", description: "A few words: the specific gap this question targets." },
           },
-          required: ["question", "expected_length", "what_it_tests"],
+          required: ["paragraph", "question", "answer_key", "what_it_tests"],
         },
       },
     },
@@ -213,25 +229,71 @@ export async function analyzeSubmission(transcript: string, syllabus: string, su
   return fillPassageSources(analysis, submissionText);
 }
 
-/** The two comprehension questions, written after the score is out. */
+const HYPOTHETICAL = /\b(would you|could you|should you|might you|will you|do you think|in your (opinion|view)|if you were|if you had|how might|what would|what could|imagine|what else|next step|want to (verify|research|check|know))\b/i;
+const sentences = (t: string) => t.trim().split(/(?<=[.!?])\s+(?=[A-Z"“])/).filter(Boolean).length;
+
+/** Problems that make a question unfit, in words the model can act on. */
+export function questionProblems(quiz: QuizQuestion[], paragraphCount: number): string[] {
+  const out: string[] = [];
+  if (quiz.length !== 2) out.push(`Write exactly 2 questions (got ${quiz.length}).`);
+  quiz.forEach((q, i) => {
+    const n = `Question ${i + 1}`;
+    if (!q.question?.trim()) out.push(`${n} is empty.`);
+    if (HYPOTHETICAL.test(q.question ?? "")) out.push(`${n} is hypothetical or asks for an opinion; ask about what the student already wrote.`);
+    if ((q.question ?? "").split(/\s+/).length > 35) out.push(`${n} is too long; keep it under 30 words.`);
+    if ((q.question ?? "").split("?").length > 2) out.push(`${n} asks more than one thing.`);
+    if (/\b(two|2) sentences\b/i.test(q.question ?? "")) out.push(`${n} asks for two sentences; it must be answerable in one.`);
+    if (!q.answer_key?.trim()) out.push(`${n} has no answer key.`);
+    else if (sentences(q.answer_key) > 1) out.push(`${n}'s answer key is longer than one sentence.`);
+    if (paragraphCount > 0 && !(Number.isInteger(q.paragraph) && q.paragraph! >= 1 && q.paragraph! <= paragraphCount))
+      out.push(`${n} doesn't name a paragraph from 1 to ${paragraphCount}.`);
+  });
+  if (paragraphCount >= 2 && quiz.length === 2 && quiz[0].paragraph === quiz[1].paragraph)
+    out.push("Both questions are about the same paragraph; use two different ones.");
+  return out;
+}
+
+/**
+ * The two comprehension questions, written after the score is out. Checked
+ * in code (one sentence, about a real paragraph, has an answer key, not
+ * hypothetical) and rewritten once with the problems listed if they fail.
+ */
 export async function writeQuizQuestions(
   transcript: string,
   syllabus: string,
   submissionText?: string
 ): Promise<Pick<QuizResult, "claimed_unassisted_areas" | "quiz">> {
   if (!process.env.ANTHROPIC_API_KEY) throw new Error("Server is missing ANTHROPIC_API_KEY.");
-  const message = await callClaude("analysis", {
-    model: MODELS.main,
-    max_tokens: 800,
-    system: QUESTIONS_PROMPT,
-    tools: [QUESTIONS_TOOL],
-    tool_choice: { type: "tool", name: "submit_questions" },
-    messages: [{ role: "user", content: userContent(transcript, syllabus, submissionText) }],
-  });
-  const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_questions");
-  if (!toolUse || toolUse.type !== "tool_use") throw new Error("The quiz writer didn't return a structured result.");
-  const r = toolUse.input as Pick<QuizResult, "claimed_unassisted_areas" | "quiz">;
-  return { claimed_unassisted_areas: r.claimed_unassisted_areas ?? [], quiz: r.quiz ?? [] };
+  const paragraphCount = submissionText ? splitParagraphs(submissionText).length : 0;
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: userContent(transcript, syllabus, submissionText) }];
+  let best: Pick<QuizResult, "claimed_unassisted_areas" | "quiz"> | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const message = await callClaude("analysis", {
+      model: MODELS.main,
+      max_tokens: 900,
+      system: QUESTIONS_PROMPT,
+      tools: [QUESTIONS_TOOL],
+      tool_choice: { type: "tool", name: "submit_questions" },
+      messages,
+    });
+    const toolUse = message.content.find((b) => b.type === "tool_use" && b.name === "submit_questions");
+    if (!toolUse || toolUse.type !== "tool_use") throw new Error("The quiz writer didn't return a structured result.");
+    const r = toolUse.input as Partial<Pick<QuizResult, "claimed_unassisted_areas" | "quiz">>;
+    const quiz = (r.quiz ?? []).slice(0, 2).map((q) => ({ ...q, expected_length: "one_sentence" as const }));
+    best = { claimed_unassisted_areas: r.claimed_unassisted_areas ?? [], quiz };
+    const problems = questionProblems(quiz, paragraphCount);
+    if (!problems.length) break;
+    messages.push(
+      { role: "assistant", content: [toolUse] },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: toolUse.id, content: `These questions break the rules:\n- ${problems.join("\n- ")}\nWrite both questions again following every rule.`, is_error: true },
+        ],
+      }
+    );
+  }
+  return best!;
 }
 
 /** Both, in parallel. Used by the test set and the admin lab. */
@@ -254,9 +316,9 @@ export type ComprehensionResult = {
   per_question: { adequate: boolean; reason: string }[];
 };
 
-const GRADE_SYSTEM_PROMPT = `You are part of an academic integrity tool. A student submitted an assignment and an AI-use transcript, then answered a short comprehension check about the parts of the work they claim they did WITHOUT AI help.
+const GRADE_SYSTEM_PROMPT = `You are part of an academic integrity tool. A student submitted an assignment and an AI-use transcript, then answered a short comprehension check about the parts of the work they claim they did WITHOUT AI help. Each question is about one paragraph of their work and comes with an answer key taken from that paragraph. Answers are meant to be one sentence.
 
-Decide, for each answer, whether it shows the student genuinely understands that part of their own submission. An answer is adequate if it is specific and consistent with the submitted work — it doesn't need to be polished or perfectly worded. An answer is NOT adequate if it is wrong, contradicts the submission, is vague or generic enough that anyone could write it without having done the work, dodges the question, or is blank / "I don't know" / nonsense.
+Decide, for each answer, whether it shows the student genuinely understands that part of their own submission. An answer is adequate if it gives the substance of the answer key, or another specific point that is correct according to the student's paragraph. Wording, spelling and polish don't matter, and one sentence is enough. An answer is NOT adequate if it is wrong, contradicts the paragraph, is vague or generic enough that anyone who only knows the topic could write it, dodges the question, or is blank / "I don't know" / nonsense. Judge against the paragraph, not your own knowledge of the topic.
 
 Set passed to false if any answer is not adequate — this does NOT mean the student cheated, only that a teacher may want to follow up (e.g. a short conversation). Never accuse or draw conclusions about intent.
 
@@ -298,8 +360,18 @@ export async function gradeAnswers(input: {
     throw new Error("Server is missing ANTHROPIC_API_KEY.");
   }
 
+  const paragraphs = splitParagraphs(input.assignmentText);
   const qa = input.quiz.quiz
-    .map((q, i) => `Q${i + 1}: ${q.question}\n(tests: ${q.what_it_tests})\nA${i + 1}: ${input.answers[i] ?? ""}`)
+    .map((q, i) => {
+      const para = q.paragraph ? paragraphs.find((p) => p.index === q.paragraph)?.text : undefined;
+      return [
+        `Q${i + 1}: ${q.question}`,
+        `(tests: ${q.what_it_tests})`,
+        para ? `Paragraph it's about: ${para}` : "",
+        q.answer_key ? `Answer key: ${q.answer_key}` : "",
+        `Student's answer: ${input.answers[i] ?? ""}`,
+      ].filter(Boolean).join("\n");
+    })
     .join("\n\n");
 
   const message = await callClaude("grading", {

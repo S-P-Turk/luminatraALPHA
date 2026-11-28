@@ -106,7 +106,10 @@ export function forStudent<T extends { reportCard?: unknown; quiz?: unknown; ass
   if (quiz) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { ai_passages, policy_severity, paragraphs, ...rest } = quiz;
-    safeQuiz = rest;
+    safeQuiz = {
+      ...rest,
+      quiz: (quiz.quiz ?? []).map((q) => ({ question: q.question, what_it_tests: q.what_it_tests, expected_length: "one_sentence" })),
+    };
   }
   const card = rc?.scoreCard;
   let result: StudentResult | null = null;

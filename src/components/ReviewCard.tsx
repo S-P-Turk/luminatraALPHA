@@ -21,7 +21,7 @@ export function scoreOf(s: { reportCard?: { scoreCard?: ScoreCard } | null }): n
 export type ReviewQuiz = {
   policy_summary: string;
   policy_concern: string | null;
-  quiz: { question: string }[];
+  quiz: { question: string; answer_key?: string }[];
 };
 
 export type ReviewSubmission = {
@@ -294,6 +294,9 @@ export function ReviewCard({
               {questions.map((q, i) => (
                 <div key={i}>
                   <div style={{ color: colors.muted }}>Q: {q.question}</div>
+                  {q.answer_key && (
+                    <div style={{ color: colors.muted, fontSize: 12 }}>Expected: {q.answer_key}</div>
+                  )}
                   <div style={{ marginTop: 2 }}>
                     {comprehension?.per_question?.[i] && (
                       <span
