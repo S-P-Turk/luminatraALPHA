@@ -476,7 +476,7 @@ export default function AssignmentsClient() {
                   <div style={{ fontSize: 13, color: "#B8822F", marginTop: 6 }}>
                     <strong>{a.rulesCard.mode === "custom" ? "Left as \"not sure\":" : "Your syllabus doesn\u2019t say:"}</strong>
                     <ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>
-                      {a.rulesCard.gaps.map((g) => <li key={g}>{g}</li>)}
+                      {a.rulesCard.gaps.map((g) => <li key={g}>{g.replace(/^(it )?doesn[’']t say /i, "")}</li>)}
                     </ul>
                   </div>
                 )}

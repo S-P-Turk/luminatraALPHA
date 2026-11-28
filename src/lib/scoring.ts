@@ -63,7 +63,7 @@ function relianceSignal(rel: RelianceResult, analyzed: boolean): Signal {
       .slice(0, 3)
       .map((p) => `¶${p.index} ${LEVEL_PHRASE[p.level as keyof typeof LEVEL_PHRASE]}`)
       .join(", ");
-    reason = `AI reliance ${Math.max(1, Math.round(rel.reliance * 100))}%: ${list}${flagged.length > 3 ? ", …" : ""} — not disclosed.`;
+    reason = `${Math.max(1, Math.round(rel.reliance * 100))}% of the work: ${list}${flagged.length > 3 ? ", …" : ""} — not disclosed.`;
   }
   return { value, points: Math.round(value * max), max, reason };
 }

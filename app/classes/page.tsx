@@ -307,7 +307,7 @@ export default function ClassesPage() {
                   )}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <Link
                   href={`/classes/${cls.id}/assignments`}
                   style={{

@@ -142,13 +142,14 @@ export function ReviewCard({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
           gap: 12,
           cursor: "pointer",
           textAlign: "left",
           color: colors.ink,
         }}
       >
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: "1 1 280px" }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>{s.studentName}</div>
           <div style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
             {s.className ? `${s.className} · ` : ""}
@@ -158,7 +159,7 @@ export function ReviewCard({
             (card
               ? (Object.keys(SIGNAL_LABELS) as (keyof typeof SIGNAL_LABELS)[])
                   .filter((k) => card.signals[k].points > 0 && card.signals[k].reason)
-                  .map((k) => ({ label: SIGNAL_LABELS[k], text: card.signals[k].reason }))
+                  .map((k) => ({ label: SIGNAL_LABELS[k], text: card.signals[k].reason.replace(/^AI reliance (\d+%):/, "$1 of the work:") }))
               : reasons
             ).map((f) => (
               <div key={f.label} style={{ fontSize: 13, color: colors.amber, marginTop: 4 }}>

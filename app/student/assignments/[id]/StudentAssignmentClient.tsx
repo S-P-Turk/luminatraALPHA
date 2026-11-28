@@ -726,21 +726,19 @@ function ResultPanel({
         closer look.
       </p>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-        <tbody>
-          {result.signals.map((s) => (
-            <tr key={s.key} style={{ borderTop: `1px solid ${colors.border}` }}>
-              <td style={{ padding: "7px 0", fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "top" }}>{SIGNAL_NAME[s.key]}</td>
-              <td style={{ padding: "7px 12px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", verticalAlign: "top" }}>
-                {s.pending ? `– / ${s.max}` : `${s.points} / ${s.max}`}
-              </td>
-              <td style={{ padding: "7px 0", color: colors.muted, verticalAlign: "top" }}>
-                {s.pending ? "After the quiz." : s.reason || "Nothing to note."}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div style={{ fontSize: 14 }}>
+        {result.signals.map((s) => (
+          <div key={s.key} style={{ borderTop: `1px solid ${colors.border}`, padding: "7px 0", display: "flex", flexWrap: "wrap", columnGap: 12, rowGap: 2 }}>
+            <span style={{ fontWeight: 600, width: 150 }}>{SIGNAL_NAME[s.key]}</span>
+            <span style={{ fontVariantNumeric: "tabular-nums", width: 64 }}>
+              {s.pending ? `– / ${s.max}` : `${s.points} / ${s.max}`}
+            </span>
+            <span style={{ color: colors.muted, flex: "1 1 240px" }}>
+              {s.pending ? "After the quiz." : (s.reason || "Nothing to note.").replace(/^AI reliance (\d+%):/, "$1 of the work:")}
+            </span>
+          </div>
+        ))}
+      </div>
 
       {result.paragraphs.length > 0 && (
         <div>
