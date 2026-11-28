@@ -1,6 +1,7 @@
 "use client";
 
 import { RulesCheck } from "./RulesCheck";
+import { QuestionCheck } from "./QuestionCheck";
 import { POLICY_CASES as SYNTHETIC_POLICIES } from "@/src/lib/eval/policies";
 import { REAL_POLICY_CASES } from "@/src/lib/eval/policies-real";
 const POLICY_CASES = [...REAL_POLICY_CASES, ...SYNTHETIC_POLICIES];
@@ -545,6 +546,7 @@ export default function LabClient() {
       </Grid>
 
       <RulesCheck />
+      <QuestionCheck />
 
       <Cell label="test set" refId="B1" id="test-set">
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>

@@ -34,8 +34,8 @@ Env vars (values in Vercel, never commit them): `DATABASE_URL`, `ANTHROPIC_API_K
 
 ## Testing
 
-- `scripts/eval/`: 36-case student test set (`src/lib/eval/cases.ts`), runnable from the admin test lab or CLI. History: v1 93%, v3 31/31 decisions & 24/29 reliance labels, v3.1 replay 29/29. **A fresh live run of v3.1 has not been done.**
-- Syllabus library: `src/lib/eval/policies-real.ts` (39 real course AI policies, condensed, with source links; internal testing only, don't publish) and `policies.ts` (30 written examples). `scripts/eval/eval-rules.ts` checks rules cards against hand labels; `import-policies.ts` loads a CSV (e.g. the crowdsourced sheet at bit.ly/Syllabi-AI-Policies).
+- `scripts/eval/`: 72-case student test set (`src/lib/eval/cases.ts`; history, biology, philosophy, CS, calculus, statistics), runnable from the admin test lab or CLI. History: v1 93%, v3 31/31 decisions & 24/29 reliance labels, v3.1 replay 29/29. **A fresh live run of v3.1 has not been done.**
+- Syllabus library: `src/lib/eval/policies-real.ts` (48 real course AI policies, 25 of them STEM (incl. physics, statistics, CS, chemistry, math), condensed, with source links; internal testing only, don't publish) and `policies.ts` (30 written examples). `scripts/eval/eval-rules.ts` checks rules cards against hand labels; `import-policies.ts` loads a CSV (e.g. the crowdsourced sheet at bit.ly/Syllabi-AI-Policies).
 - Everything shipped on 2026-11-25 was tested only against a mock Claude server (the previous environment had no API key): rules cards, score levers, background analysis, revisions, redaction, rules eval.
 
 ## API key (read this before asking about it)
@@ -45,7 +45,7 @@ Claude Code itself runs on the founder's claude.ai login and needs no API key. O
 ## Do next (in order)
 
 1. `npx tsx scripts/eval/eval-rules.ts real-` and fix any "too lenient" errors (card allows what the syllabus forbids).
-2. Run the full 36-case test set against the real model; confirm v3.1 and the new student result view.
+2. Run the full 72-case test set and the quiz question check (test lab B3: 24 cases, author vs bluffer) against the real model; confirm v3.1 and the new student result view.
 3. One live end-to-end pass on the deployed site: teacher creates assignment → rules card + gaps → student submits → score + levers → revise with added chat → activate quiz → teacher review.
 4. Speed work shipped 2026-11-28 (split analysis, no-AI fast path, AI source text once, Haiku for rules/grading). Rerun the rules check and the full test set to confirm Haiku didn't cost accuracy; if rules accuracy drops, move `generateRulesCard` back to `MODELS.main`.
 5. Pilot prep: one-page data-handling statement, student guide for pasting AI chats, ask the pilot school whether a data privacy agreement is required (decides Bedrock vs current setup).

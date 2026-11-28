@@ -1,7 +1,7 @@
 import { db } from "@/src/prisma/db";
 import { CASES, type EvalCase } from "./cases";
 
-// The built-in 36 cases plus any saved from the admin test lab.
+// The built-in 72 cases plus any saved from the admin test lab.
 export async function allCases(): Promise<EvalCase[]> {
   const saved = await db.orm.public.LabCase.orderBy((c) => c.createdAt.asc()).all();
   return [

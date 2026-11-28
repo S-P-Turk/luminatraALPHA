@@ -1,4 +1,4 @@
-// Luminatra evaluation set: 3 course policies x 12 student scenarios = 36
+// Luminatra evaluation set: 6 courses (3 essay, 3 STEM) x 12 student scenarios = 72
 // synthetic cases with the outcome a reasonable integrity officer would
 // expect. "either" marks genuinely borderline cases that aren't scored.
 // expectReliance is the answer key for the AI reliance label: the highest
@@ -24,6 +24,9 @@ export type EvalCase = {
 type Course = {
   key: string;
   name: string;
+  // strict: brainstorm/feedback allowed, no AI-written work even if disclosed.
+  // permissive: anything goes if disclosed. no_ai: nothing at all.
+  policy: "strict" | "permissive" | "no_ai";
   syllabus: string;
   instructions: string;
   ownParagraph: string; // written by the student
@@ -45,6 +48,7 @@ const courses: Course[] = [
   {
     key: "hist",
     name: "HIST 101 (strict: no AI-written sentences)",
+    policy: "strict",
     syllabus:
       "AI policy: You may use AI tools to brainstorm topics and to check grammar. AI may not write any sentence that appears in your essay. Disclose all AI use in a short statement at the end.",
     instructions: "Essay 1: In 300 words, argue whether the Treaty of Versailles made a second world war more likely.",
@@ -76,6 +80,7 @@ const courses: Course[] = [
   {
     key: "bio",
     name: "BIO 210 (permissive: AI drafting allowed with disclosure)",
+    policy: "permissive",
     syllabus:
       "AI policy: AI tools may be used for any part of this lab report, including drafting text, as long as your AI-use statement identifies which parts were written by AI.",
     instructions: "Lab report 2: Explain how temperature affected catalase activity in your experiment.",
@@ -107,6 +112,7 @@ const courses: Course[] = [
   {
     key: "phil",
     name: "PHIL 120 (no AI at all)",
+    policy: "no_ai",
     syllabus: "AI policy: No use of AI tools of any kind is permitted on this assignment, including brainstorming and grammar checking.",
     instructions: "Response paper: Is lying to a murderer at the door wrong under Kant's categorical imperative?",
     ownParagraph:
@@ -134,14 +140,149 @@ const courses: Course[] = [
     heavyParagraph:
       "Kant's critics, most famously Benjamin Constant, said the duty to tell the truth only applies to people who have a right to the truth, and a murderer looking for a victim has forfeited that right.",
   },
+
+  // STEM courses: code, a calculus proof and a statistics report. Paragraphs
+  // of code have no blank lines inside, so each function is one paragraph.
+  {
+    key: "cs",
+    name: "CS 101 Python (strict: AI may explain and debug, never write code)",
+    policy: "strict",
+    syllabus:
+      "AI policy: You may ask AI to explain a concept or an error message, and to brainstorm how to approach a problem before you write code. You may ask AI to help find a bug in code you wrote yourself if you disclose it. AI may not write any code you submit, whether whole programs or single functions, and Copilot-style autocomplete is not allowed. Disclose all AI use in a comment at the top of your file.",
+    instructions:
+      "Assignment 3: Write summarize(scores), which returns the average, highest and lowest score without using max, min or sum; letter_grade(average); and count_passing(scores). Explain how summarize handles an empty list.",
+    ownParagraph: `def summarize(scores):
+    if not scores:
+        return None  # an empty list has no average, and len 0 would divide by zero
+    total = 0
+    high = low = scores[0]
+    for s in scores:
+        total += s
+        if s > high:
+            high = s
+        if s < low:
+            low = s
+    return total / len(scores), high, low`,
+    ownDraftRough: `def summarize(scores):
+    total = 0
+    high = 0
+    low = 0
+    for s in scores:
+        total += s
+        if s > high: high = s
+        if s < low: low = s
+    return total/len(scores), high, low`,
+    aiParagraph: `def letter_grade(average):
+    if average >= 90:
+        return "A"
+    elif average >= 80:
+        return "B"
+    elif average >= 70:
+        return "C"
+    elif average >= 60:
+        return "D"
+    return "F"`,
+    aiIdeas: "Think about which inputs could break it: test with an empty list, a list with one score, and a list containing negative numbers.",
+    aiFeedback:
+      "Two bugs: starting low at 0 means it never changes for positive scores, so start high and low at the first score instead. And an empty list will raise ZeroDivisionError, so check for that before dividing.",
+    aiRephrase: {
+      before: "# returns avg high low",
+      after: "# Returns the average, highest, and lowest score as a tuple.",
+    },
+    source: "the Python tutorial section on for statements (docs.python.org)",
+    aiSourceSummary:
+      "The tutorial explains that Python's for statement loops over the items of any sequence, like a list or a string, in the order they appear, rather than counting through numbers as in C.",
+    draftRequest: "Write the letter_grade function for my assignment.",
+    aiArgument:
+      "Instead of a long if/elif chain, you could store the cutoffs as a list of (minimum, letter) pairs from highest to lowest and loop through it, returning the first letter whose minimum the average meets.",
+    ideaParagraph: `def letter_grade(average):
+    cutoffs = [(90, "A"), (80, "B"), (70, "C"), (60, "D")]
+    for minimum, letter in cutoffs:
+        if average >= minimum:
+            return letter
+    return "F"`,
+    aiExplain: `To count how many scores pass, start a counter at zero and add one each time a score is at or above the cutoff:
+def count_passing(scores, cutoff=60):
+    count = 0
+    for s in scores:
+        if s >= cutoff:
+            count += 1
+    return count`,
+    heavyParagraph: `def count_passing(scores, cutoff=60):
+    passed = 0
+    for score in scores:
+        if score >= cutoff:
+            passed += 1
+    return passed`,
+  },
+  {
+    key: "math",
+    name: "MATH 126 Calculus II (no AI at all, including answer checkers)",
+    policy: "no_ai",
+    syllabus:
+      "AI policy: Problem sets must be entirely your own work. Do not use AI tools (ChatGPT, Claude, Wolfram Alpha step-by-step, Photomath or similar) for any part of a problem set, including brainstorming, checking answers or polishing your write-up.",
+    instructions: "Problem set 4, question 2: Show that the series of 1/n^2 converges, and explain which test you used and why it applies.",
+    ownParagraph:
+      "I used the integral test. The function f(x) = 1/x^2 is positive, continuous and decreasing for x ≥ 1, and the integral of 1/x^2 from 1 to infinity is the limit of 1 − 1/b as b goes to infinity, which is 1. Since that integral is finite, the series converges too.",
+    ownDraftRough: "integral test, 1/x^2 positive decreasing, integral 1 to inf is 1 so the series converges",
+    aiParagraph:
+      "By the p-series test, a series of the form 1/n^p converges whenever p > 1; since p = 2 here, the series converges, and its sum is in fact π²/6, a result first proved by Euler.",
+    aiIdeas: "You could compare the terms with a series you already know, or think about how quickly 1/n^2 shrinks compared with 1/n.",
+    aiFeedback: "Your steps are correct. Say that f is decreasing before you apply the test, and write the limit out explicitly.",
+    aiRephrase: { before: "So the series has to converge.", after: "Therefore, the series converges." },
+    source: "Stewart, Calculus, section 11.3 on the integral test",
+    aiSourceSummary:
+      "Stewart's integral test says that if f is positive, continuous and decreasing for x ≥ 1, the series of f(n) and the integral of f from 1 to infinity either both converge or both diverge.",
+    draftRequest: "Write the solution showing the series of 1/n^2 converges.",
+    aiArgument:
+      "You can also compare it with the telescoping series 1/(n(n−1)) for n ≥ 2: each 1/n^2 is smaller than 1/(n(n−1)), and that series adds up to exactly 1.",
+    ideaParagraph:
+      "As a check I compared each term with 1/(n(n−1)) starting at n = 2. Every 1/n^2 is smaller, and the bigger series telescopes down to 1, so ours can't blow up either.",
+    aiExplain:
+      "The comparison test works because if 0 ≤ a_n ≤ b_n for every n and the series of b_n converges, the partial sums of a_n are increasing and bounded above, so they must converge.",
+    heavyParagraph:
+      "The comparison test works since if 0 ≤ a_n ≤ b_n for all n and the series of b_n converges, then the partial sums of a_n are increasing and bounded above, so they have to converge.",
+  },
+  {
+    key: "stats",
+    name: "PSYC 274 Statistics (permissive: AI code and drafting allowed with disclosure)",
+    policy: "permissive",
+    syllabus:
+      "AI policy: You may use AI tools for any part of the data analysis report, including writing R code and drafting text, as long as your AI-use statement says which parts were AI-generated. You are responsible for every number you report being correct.",
+    instructions: "Report 2: Run an independent-samples t-test on the sleep and exam-score data and interpret the result in one or two paragraphs.",
+    ownParagraph:
+      "Students who slept 7 or more hours scored higher (M = 82.4) than those who slept less (M = 76.1). The t-test gave t(58) = 2.31, p = .024, so the difference is unlikely to be chance at the .05 level, but this wasn't an experiment, so I can't say the extra sleep caused the higher scores.",
+    ownDraftRough: "more sleep group higher 82.4 vs 76.1, t(58)=2.31 p=.024 significant, but not an experiment so cant say sleep causes it",
+    aiParagraph:
+      "An independent-samples t-test indicated that participants reporting at least seven hours of sleep achieved significantly higher examination scores than their sleep-deprived counterparts, suggesting that adequate rest may enhance academic performance.",
+    aiIdeas: "A results paragraph usually covers the group means, the test statistic with its degrees of freedom, the p-value, and what the study design does and doesn't let you conclude.",
+    aiFeedback: "Report the standard deviations too, and use APA style with italic t and p.",
+    aiRephrase: {
+      before: "The p value was small so it matters.",
+      after: "The small p-value indicates a statistically significant difference.",
+    },
+    source: "Field, Discovering Statistics Using R, chapter 9 on t-tests",
+    aiSourceSummary:
+      "Field explains that an independent t-test compares the means of two unrelated groups and assumes roughly normal data and similar variances in each group.",
+    draftRequest: "Write the results paragraph for my t-test on sleep and exam scores.",
+    aiArgument:
+      "One angle: the p-value tells you the difference is unlikely to be chance, but not how big it is. Cohen's d would show whether a six-point gap is practically meaningful.",
+    ideaParagraph:
+      "A p-value under .05 doesn't tell me how big the gap is, so I also worked out Cohen's d, which came to about 0.6. That's a medium-sized difference, so six points is not trivial.",
+    aiExplain:
+      "Welch's t-test is often safer than Student's t-test because it does not assume the two groups have equal variances, and it performs almost as well even when the variances are in fact equal.",
+    heavyParagraph:
+      "Welch's t-test is often a safer choice than Student's t-test because it doesn't assume both groups have equal variances, and it performs nearly as well even when the variances really are equal.",
+  },
+
 ];
 
 const NO_AI = "I did not use AI for this assignment.";
 
 function build(c: Course): EvalCase[] {
-  const strict = c.key === "hist";
-  const permissive = c.key === "bio";
-  const noAI = c.key === "phil";
+  const strict = c.policy === "strict";
+  const permissive = c.policy === "permissive";
+  const noAI = c.policy === "no_ai";
   const mk = (
     n: number,
     scenario: string,
@@ -181,7 +322,7 @@ function build(c: Course): EvalCase[] {
     ),
     mk(
       3,
-      "AI grammar check on own draft",
+      "AI checked own draft (grammar or bugs), disclosed",
       `${c.ownParagraph}\n\nAI statement: I used AI to check grammar.`,
       `User: Check the grammar in my draft: ${c.ownDraftRough}\nAssistant: ${c.aiFeedback}`,
       "knows_work",

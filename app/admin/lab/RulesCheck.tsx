@@ -7,7 +7,7 @@ import { REAL_POLICY_CASES } from "@/src/lib/eval/policies-real";
 import type { RulesCheckResult } from "@/src/lib/eval/rules-check";
 import { gradeCase, GRADES, type Grade, type Miss } from "@/src/lib/eval/rules-grade";
 
-// Runs the rules-card check on the 39 real course policies, on the live
+// Runs the rules-card check on the real course policies (48), on the live
 // site's API key, from the browser. Same logic as scripts/eval/eval-rules.ts.
 
 type Row = { id: string; state: "idle" | "running" | "done" | "error"; result?: RulesCheckResult; error?: string };
