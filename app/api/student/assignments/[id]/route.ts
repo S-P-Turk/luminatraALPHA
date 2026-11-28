@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/src/prisma/db";
 import { getCurrentStudentSession } from "@/src/lib/student-auth";
 import { forStudent } from "@/src/lib/grading";
-import { ensureQuizQuestions } from "@/src/lib/analyze";
+import { ensureQuizQuestions, ANALYZING, ANALYSIS_FAILED } from "@/src/lib/analyze";
 import { ensureRulesCard, rulesForStudent } from "@/src/lib/rules";
 
 export const maxDuration = 60;
@@ -39,6 +39,17 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/student/ass
   let submission = await db.orm.public.Submission
     .where({ assignmentId: id, studentEmail: session.email })
     .first();
+
+  // An analysis still marked as running after 4 minutes was cut off (a
+  // deploy or a server timeout). Mark it failed so the student gets the
+  // free "Try again" button instead of a spinner that never ends.
+  if (submission?.status === ANALYZING && Date.now() - new Date(submission.updatedAt as unknown as string).getTime() > 4 * 60_000) {
+    await db.orm.public.Submission.where({ id: submission.id }).update({
+      status: ANALYSIS_FAILED,
+      reportCard: { error: "The analysis was interrupted." },
+    });
+    submission = await db.orm.public.Submission.where({ id: submission.id }).first();
+  }
 
   // The quiz is written after the score. If the teacher has opened the quiz
   // and the questions aren't there yet, write them now.

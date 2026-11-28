@@ -82,9 +82,16 @@ const inputStyle: React.CSSProperties = {
   resize: "vertical" as const,
 };
 
+// Keyed by assignment id: moving to another assignment starts from a clean
+// page instead of carrying over the last one's state and timers.
 export default function StudentAssignmentClient() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
+  return <AssignmentView key={params.id} id={params.id} />;
+}
+
+function AssignmentView({ id }: { id: string }) {
+  const router = useRouter();
+  const params = { id };
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,16 +110,34 @@ export default function StudentAssignmentClient() {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, []);
 
-  // While the analysis runs in the background, check back every 3 seconds.
-  const analyzing = detail?.submission?.status === "analyzing";
+  // Keep the page current without a manual reload: fast while the analysis
+  // runs or the quiz is being prepared, slower while waiting for the teacher
+  // to start the quiz, and again whenever the student comes back to the tab.
+  const sub = detail?.submission;
+  const quizOpen = detail?.assignment.quizOpen ?? false;
+  const pollEvery =
+    sub?.status === "analyzing" ? 3000
+    : sub?.quiz && !sub.quizAnswers && quizOpen && sub.quiz.quiz.length === 0 ? 4000
+    : sub?.quiz && !sub.quizAnswers && !quizOpen && !revising ? 20000
+    : 0;
   useEffect(() => {
-    if (!analyzing) return;
-    const t = setInterval(() => void load(), 3000);
+    if (!pollEvery) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, pollEvery);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analyzing]);
+  }, [pollEvery]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function retryAnalysis() {
     setError(null);
@@ -143,7 +168,8 @@ export default function StudentAssignmentClient() {
     }
     setDetail(data);
     if (data.submission?.quiz?.quiz?.length) {
-      setAnswers(data.submission.quizAnswers ?? data.submission.quiz.quiz.map(() => ""));
+      const n = data.submission.quiz.quiz.length;
+      setAnswers((prev) => data.submission.quizAnswers ?? (prev.length === n ? prev : Array(n).fill("")));
     }
   }
 
